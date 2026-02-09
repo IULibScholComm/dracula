@@ -1,0 +1,672 @@
+# Text analysis: Dracula
+
+```{python}
+#| label: imports_analysis
+#| echo: false
+#| eval: true
+#| cache: true
+#| freeze: auto
+#| warning: false
+#| error: false
+
+from pathlib import Path
+import re
+import logging
+import sys
+import json
+import pandas as pd
+import numpy as np
+import nltk
+from collections import Counter
+import time
+
+# optional heavy deps (import when needed so Quarto render won't fail if absent)
+# from nltk.sentiment.vader import SentimentIntensityAnalyzer
+# import spacy
+# from geopy.geocoders import Nominatim
+# import folium
+# import plotly.express as px
+# from IPython.display import IFrame, display
+
+# Logging config
+logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+
+# Ensure data dir
+DATA_DIR = Path("data")
+DATA_DIR.mkdir(exist_ok=True)
+RESOURCES_DIR = Path("resources")
+RESOURCES_DIR.mkdir(exist_ok=True)
+
+```
+
+```{python}
+#| label: load_clean_witness
+#| echo: false
+#| eval: true
+#| cache: true
+#| freeze: auto
+#| warning: false
+#| error: false
+
+def load_chapters_from_clean_text(path: Path):
+    """
+    Read a cleaned text file and split into chapters / preface.
+    Accepts markers like:
+      [PREFACE], [CHAPTER 1], [CHAPTER 01], [CHAPTER 10], [FULL_TEXT]
+    Returns DataFrame with columns: chapter (int), marker (str), text (str)
+    """
+    txt = path.read_text(encoding="utf-8")
+    # Accept any digits for CHAPTER
+    parts = re.split(r'(?m)^\[(PREFACE|CHAPTER\s+\d+|FULL_TEXT)\]\s*$', txt, flags=re.IGNORECASE)
+    chapters = []
+    if len(parts) < 3:
+        # fallback: naive splitting on lines that start with [CHAPTER
+        logging.warning("Primary chapter-splitting pattern did not find markers; using fallback split.")
+        split_points = re.split(r'(?m)^\[CHAPTER\s+\d+\]', txt)
+        for i, block in enumerate(split_points, start=1):
+            chapters.append({"chapter": i, "marker": f"CHAPTER {i:02d}", "text": block.strip()})
+    else:
+        i = 1
+        for j in range(1, len(parts), 2):
+            marker = parts[j].strip()
+            body = parts[j+1].strip() if (j+1) < len(parts) else ""
+            m = re.search(r'CHAPTER\s+(\d+)', marker, flags=re.IGNORECASE)
+            if m:
+                idx = int(m.group(1))
+            elif marker.strip().upper().startswith("PREFACE"):
+                idx = 0
+            else:
+                idx = i
+            chapters.append({"chapter": idx, "marker": marker, "text": body})
+            i += 1
+
+    # sort by numeric chapter (preface=0 at top)
+    chapters = sorted(chapters, key=lambda r: (r['chapter'] if isinstance(r['chapter'], int) else 9999))
+    df = pd.DataFrame([{"chapter": int(c["chapter"]), "marker": c["marker"], "text": c["text"]} for c in chapters])
+    logging.info(f"Loaded {len(df)} chapter blocks (including PREFACE if present).")
+    return df
+
+clean_path = RESOURCES_DIR / "dracula_clean.txt"
+if not clean_path.exists():
+    raise FileNotFoundError(f"{clean_path} not found. Place the cleaned text at {clean_path}")
+
+chap_df = load_chapters_from_clean_text(clean_path)
+
+```
+
+```{python}
+#| label: compute_or_load_chap_lemmas
+#| echo: false
+#| eval: true
+#| cache: false
+#| warning: false
+#| error: false
+
+import importlib
+from typing import Optional
+
+CACHE_PATH = DATA_DIR / "chap_lemmas.csv"
+
+def compute_lemmas_df(chap_df: pd.DataFrame, use_spacy: bool = True, spacy_model: str = "en_core_web_sm") -> pd.DataFrame:
+    df = chap_df.copy().sort_values("chapter").reset_index(drop=True)
+    df["text"] = df["text"].fillna("").astype(str)
+    df["word_count"] = df["text"].str.split().str.len().fillna(0).astype(int)
+
+    nlp = None
+    if use_spacy:
+        try:
+            import spacy
+            # try load model
+            nlp = spacy.load(spacy_model, disable=["ner","parser","textcat"])
+            logging.info(f"Loaded spaCy model: {spacy_model}")
+        except Exception as e:
+            logging.warning(f"spaCy model load failed ({e}); falling back to token-only processing.")
+            nlp = None
+
+    lemmas_list = []
+    texts = df["text"].tolist()
+
+    if nlp is not None:
+        # prefer nlp.pipe with safe parameters; avoid n_process unless explicitly supported
+        for doc in nlp.pipe(texts, batch_size=8):
+            lemma_tokens = [tok.lemma_.lower() for tok in doc if tok.is_alpha]
+            lemmas_list.append(" ".join(lemma_tokens))
+    else:
+        # simple fallback tokenization (alphabetic only)
+        for t in texts:
+            lemmas_list.append(" ".join(re.findall(r"[A-Za-z]+", t.lower())))
+
+    df_out = pd.DataFrame({
+        "chapter": df["chapter"].astype(int),
+        "marker": df.get("marker", df["chapter"].astype(str)),
+        "lemmas_str": lemmas_list,
+        "word_count": df["word_count"].astype(int)
+    })
+
+    df_out.to_csv(CACHE_PATH, index=False, encoding="utf-8")
+    logging.info(f"Wrote lemma cache to {CACHE_PATH} ({len(df_out)} rows).")
+    return df_out
+
+def load_or_compute_lemmas(chap_df: pd.DataFrame, force_recompute: bool = False) -> pd.DataFrame:
+    if CACHE_PATH.exists() and not force_recompute:
+        try:
+            df_cached = pd.read_csv(CACHE_PATH, encoding="utf-8")
+            df_cached["chapter"] = pd.to_numeric(df_cached["chapter"], errors="coerce").fillna(0).astype(int)
+            df_cached["word_count"] = pd.to_numeric(df_cached.get("word_count", 0), errors="coerce").fillna(0).astype(int)
+            logging.info(f"Loaded cached lemmas from {CACHE_PATH}")
+            return df_cached
+        except Exception as e:
+            logging.warning(f"Failed to load cached lemmas ({e}), will recompute.")
+    # compute using spaCy if available
+    try:
+        return compute_lemmas_df(chap_df, use_spacy=True)
+    except Exception as e:
+        logging.warning(f"spaCy computation failed: {e} — falling back to tokenization-only.")
+        return compute_lemmas_df(chap_df, use_spacy=False)
+
+# set to True if you want to force recompute in Quarto run (e.g., for reproducible build)
+FORCE_RECOMPUTE_LEMMAS = False
+chap_lemmas_df = load_or_compute_lemmas(chap_df, force_recompute=FORCE_RECOMPUTE_LEMMAS)
+
+```
+
+```{python}
+#| label: widgets_termfreq_lemmatized
+#| echo: false
+#| eval: true
+#| cache: false
+#| warning: false
+#| error: false
+
+"""
+Interactive lemmatized term-frequency widget for Binder/Jupyter.
+
+Behavior:
+- In an interactive Jupyter environment (Binder), shows a text box + button.
+  The user types a word or phrase and clicks Plot (or presses Enter) to produce a line plot.
+- In a non-interactive static render, prints a short message explaining how to use it in Binder.
+"""
+
+import logging
+import re
+import pandas as pd
+
+# Defensive checks
+if "chap_lemmas_df" not in globals():
+    raise RuntimeError("chap_lemmas_df not found — run the chapter/lemma cells before this one.")
+
+# Helper functions (same as earlier)
+def lemmatize_query_simple(q: str):
+    q = q.strip().lower()
+    if not q:
+        return []
+    return re.findall(r"[a-z]+", q)
+
+def count_lemma_sequence(lemmas, lemma_strings):
+    if not lemmas:
+        return [0] * len(lemma_strings)
+    seq = r"\s+".join(re.escape(l) for l in lemmas)
+    pattern = re.compile(rf"\b{seq}\b", flags=re.IGNORECASE)
+    return [len(pattern.findall(s)) if isinstance(s, str) else 0 for s in lemma_strings]
+
+def make_plot_df(lemmas_str_df: pd.DataFrame, query: str, normalize: bool = False):
+    lemmas = lemmatize_query_simple(query)
+    counts = count_lemma_sequence(lemmas, lemmas_str_df["lemmas_str"].tolist())
+
+    plot_df = pd.DataFrame({
+        "chapter": lemmas_str_df["chapter"].astype(int).tolist(),
+        "count": counts,
+        "marker": lemmas_str_df.get("marker", lemmas_str_df["chapter"].astype(str)).tolist(),
+        "word_count": lemmas_str_df["word_count"].astype(int).tolist()
+    }).sort_values("chapter").reset_index(drop=True)
+
+    plot_df = plot_df[plot_df["chapter"] > 0].copy()  # exclude preface / aggregate (chapter==0)
+
+    if plot_df.empty:
+        return plot_df  # empty DataFrame to signal nothing to plot
+
+    if normalize:
+        plot_df["norm_per_1k"] = plot_df["count"] / (plot_df["word_count"].replace({0: 1}) / 1000.0)
+    return plot_df
+
+# Try to import interactive dependencies
+INTERACTIVE = False
+try:
+    import ipywidgets as widgets
+    from IPython.display import display, HTML, clear_output
+    import plotly.express as px
+    INTERACTIVE = True
+except Exception:
+    # Not running in a widget-capable environment (static Quarto render); we'll show an explanatory message below.
+    INTERACTIVE = False
+
+if not INTERACTIVE:
+    # Non-interactive build: show brief instructions for Binder usage
+    print("This page includes an interactive term-frequency widget. To use it, launch this Quarto project in Binder (see project README or https://quarto.org/docs/projects/binder.html).")
+    print("In Binder's Jupyter interface, open this notebook and type a word or phrase into the textbox, then click Plot.")
+else:
+    # Build UI: text input + normalize checkbox + plot area + helpful instructions
+    term_input = widgets.Text(
+        value="",
+        placeholder="Type a word or phrase (e.g. vampire)",
+        description="Term:",
+        layout=widgets.Layout(width="60%")
+    )
+
+    normalize_chk = widgets.Checkbox(
+        value=False,
+        description="Normalize (per 1k words)",
+        indent=False
+    )
+
+    plot_btn = widgets.Button(description="Plot", button_style="primary")
+    out = widgets.Output(layout=widgets.Layout(width="100%"))
+
+    def render_plot_for_query(query_text, normalize=False):
+        """
+        Build and show a plotly figure for the given query_text.
+        Returns True if successful, False if nothing to show.
+        """
+        q = query_text.strip()
+        if not q:
+            with out:
+                clear_output(wait=True)
+                print("Please enter a word or phrase to plot.")
+            return False
+
+        plot_df = make_plot_df(chap_lemmas_df, q, normalize=normalize)
+        with out:
+            clear_output(wait=True)
+            if plot_df.empty:
+                print(f"No occurrences of '{q}' found in chapter texts.")
+                return False
+
+            # Pick column to plot
+            ycol = "norm_per_1k" if normalize and "norm_per_1k" in plot_df.columns else "count"
+            ylabel = "Occurrences per 1,000 words" if ycol == "norm_per_1k" else "Raw occurrences"
+
+            try:
+                fig = px.line(
+                    plot_df,
+                    x="chapter",
+                    y=ycol,
+                    markers=True,
+                    title=f"Frequency of '{q}' by chapter",
+                    labels={"chapter": "Chapter", ycol: ylabel},
+                    hover_data=["marker", "chapter", ycol]
+                )
+                fig.update_traces(mode="lines+markers")
+                fig.update_layout(height=420, margin=dict(l=40, r=20, t=60, b=40), xaxis=dict(dtick=1))
+                fig.show()
+                return True
+            except Exception as e:
+                print("Plotly failed to render the figure:", e)
+                return False
+
+    # Wire events: button click + Enter key on input triggers the same behavior
+    def on_click_btn(b):
+        render_plot_for_query(term_input.value, normalize_chk.value)
+
+    def on_submit_enter(change):
+        # only react when Enter pressed (the change type is 'submit' in ipywidgets, but Text doesn't send submit in all versions)
+        # a common pattern: react when value changes but user expects Enter; we'll bind to .on_submit if available
+        pass
+
+    plot_btn.on_click(on_click_btn)
+
+    # bind Enter key if Text has on_submit (ipykernel >= ?)
+    try:
+        term_input.on_submit(lambda widget: render_plot_for_query(widget.value, normalize_chk.value))
+    except Exception:
+        # fallback: helpful tip in UI; user can click Plot
+        pass
+
+    # render the UI
+    display(HTML("<h4>Search term frequency across chapters (lemmatized)</h4>"))
+    display(widgets.HBox([term_input, plot_btn, normalize_chk]))
+    display(out)
+
+    # Optionally show a short hint / example
+    with out:
+        print("Type a word (e.g., 'vampire') and click Plot. Press Enter in the textbox where supported.")
+
+
+```
+
+```{python}
+#| label: widgets_termfreq
+#| echo: false
+#| eval: true
+#| cache: false
+#| warning: false
+#| error: false
+
+def counts_for_term(term, df):
+    term = term.strip()
+    if term == "":
+        return [0] * len(df)
+    q = re.escape(term)
+    q = q.replace(r"\ ", r"\s+")
+    pattern = re.compile(rf"\b{q}\b", flags=re.IGNORECASE)
+    counts = []
+    for t in df["text"]:
+        if not isinstance(t, str) or t.strip()=="":
+            counts.append(0)
+        else:
+            counts.append(len(pattern.findall(t)))
+    return counts
+
+plot_df_template = chap_df[chap_df["chapter"] >= 0].sort_values("chapter").copy()
+plot_df_template["word_count"] = plot_df_template["text"].str.split().str.len().fillna(0).astype(int)
+
+# Non-interactive example (Quarto-friendly)
+term = "vampire"
+counts = counts_for_term(term, plot_df_template)
+df_plot = pd.DataFrame({
+    "chapter": plot_df_template["chapter"].astype(int),
+    "count": counts,
+    "marker": plot_df_template.get("marker", plot_df_template["chapter"].astype(str))
+}).sort_values("chapter")
+df_plot = df_plot[df_plot["chapter"] > 0]
+df_plot["norm_per_1k"] = df_plot["count"] / (plot_df_template.loc[df_plot.index, "word_count"].replace({0:1}) / 1000)
+
+# Static example: show raw counts line
+import plotly.express as px
+fig = px.line(df_plot, x="chapter", y="count", markers=True, title=f"Frequency of “{term}” by chapter",
+              labels={"chapter":"Chapter","count":"Raw occurrences"})
+fig.update_layout(height=420, xaxis=dict(dtick=1), margin=dict(l=40,r=20,t=60,b=40))
+fig.show()
+
+# Interactive ipywidgets UI if available (same pattern as above)
+if INTERACTIVE:
+    term_input = widgets.Text(value="vampire", placeholder="Type a word or phrase...", description="Term:", layout=widgets.Layout(width="60%"))
+    normalize_chk = widgets.Checkbox(value=False, description="Normalize (per 1k words)", indent=False)
+    stopwords_chk = widgets.Checkbox(value=False, description="Remove simple stopwords", indent=False)
+    submit_btn = widgets.Button(description="Plot", button_style="primary")
+    out = widgets.Output(layout=widgets.Layout(width="100%"))
+
+    def on_submit(_):
+        with out:
+            clear_output(wait=True)
+            t = term_input.value.strip()
+            if not t:
+                print("Enter a term to visualize.")
+                return
+            counts = counts_for_term(t, plot_df_template)
+            df_plot2 = pd.DataFrame({
+                "chapter": plot_df_template["chapter"].astype(int),
+                "count": counts,
+            }).sort_values("chapter")
+            if normalize_chk.value:
+                df_plot2["norm_per_1k"] = df_plot2["count"] / (plot_df_template["word_count"].replace({0:1}) / 1000).values
+                ycol = "norm_per_1k"
+            else:
+                ycol = "count"
+            fig2 = px.line(df_plot2[df_plot2["chapter"]>0], x="chapter", y=ycol, markers=True,
+                          title=f"Frequency of “{t}” by chapter", labels={"chapter":"Chapter", ycol:"Occurrences"})
+            fig2.update_layout(height=420, xaxis=dict(dtick=1))
+            fig2.show()
+
+    submit_btn.on_click(on_submit)
+    display(HTML("<h4>Search term frequency across chapters (raw)</h4>"))
+    display(widgets.HBox([term_input, submit_btn]))
+    display(widgets.HBox([normalize_chk, stopwords_chk]))
+    display(out)
+
+
+```
+
+```{python}
+#| label: sentiment_vader
+#| echo: false
+#| eval: true
+#| cache: true
+#| freeze: auto
+#| warning: false
+#| error: false
+
+# ensure VADER resource available; try to download quietly if missing
+try:
+    nltk.data.find("sentiment/vader_lexicon.zip")
+except LookupError:
+    logging.info("Downloading VADER lexicon (nltk).")
+    nltk.download("vader_lexicon", quiet=True)
+
+from nltk.sentiment.vader import SentimentIntensityAnalyzer
+sid = SentimentIntensityAnalyzer()
+
+# compute raw VADER compound score per chapter (works for full chapter text)
+chap_df = chap_df.copy()
+chap_df['vader_compound'] = chap_df['text'].apply(lambda t: sid.polarity_scores(t)['compound'] if isinstance(t, str) else 0.0)
+
+# compute word counts and guard against zero
+chap_df['word_count'] = chap_df['text'].str.split().str.len().fillna(0).astype(int)
+wc = chap_df['word_count'].replace({0: 1})   # safe divisor
+chap_df['sentiment_per_1k_words'] = chap_df['vader_compound'] / (wc / 1000.0)
+
+# persist for later use or external analysis
+( DATA_DIR / "sentiment_by_chapter.csv" ).write_text(chap_df[['chapter','marker','word_count','vader_compound','sentiment_per_1k_words']].to_csv(index=False, encoding="utf-8"), encoding="utf-8")
+logging.info("Wrote data/sentiment_by_chapter.csv")
+```
+```{python}
+#| label: sentiment_line_plot_normalized
+#| echo: false
+#| eval: true
+#| cache: true
+#| freeze: auto
+#| warning: false
+#| error: false
+
+import plotly.express as px
+
+plot_df = chap_df[chap_df["chapter"] > 0].sort_values("chapter").copy()
+if plot_df.empty:
+    print("No chapter data available to plot.")
+else:
+    plot_df["chapter"] = pd.to_numeric(plot_df["chapter"], errors="coerce")
+
+    fig = px.line(plot_df, x="chapter", y="sentiment_per_1k_words", markers=True,
+                  title="Length-normalized sentiment trajectory across Dracula",
+                  labels={"chapter":"Chapter", "sentiment_per_1k_words":"Sentiment per 1,000 words (VADER)"},
+                  hover_data={"marker":True, "sentiment_per_1k_words":":.3f"})
+    fig.add_hline(y=0, line_dash="dash", line_color="gray", annotation_text="Neutral (0)", annotation_position="bottom right")
+    fig.update_layout(margin=dict(l=60, r=20, t=60, b=60), height=420, xaxis=dict(dtick=1, tickmode="linear"), template="plotly_white")
+    fig.show()
+
+```
+
+
+```{python}
+#| label: ner_spacy_per_chapter
+#| echo: false
+#| eval: true
+#| cache: true
+#| freeze: auto
+#| warning: false
+#| error: false
+
+try:
+    import spacy
+    nlp = spacy.load("en_core_web_sm")
+    logging.info("spaCy model loaded for NER.")
+except Exception as e:
+    logging.warning(f"spaCy model not available ({e}). Skipping NER extraction and writing empty CSVs.")
+    nlp = None
+
+OUTPUT_PLACES_BY_CH = DATA_DIR / "places_by_chapter_raw.csv"
+OUTPUT_PLACE_COUNTS = DATA_DIR / "place_counts_raw.csv"
+OUTPUT_PLACES_PER_CH = DATA_DIR / "places_per_chapter_raw.csv"
+OUTPUT_PLACES_JSON = DATA_DIR / "places_per_chapter.json"
+
+rows = []
+if nlp:
+    # conservative heuristics
+    DIRECTIONAL = set(["north","south","east","west","northern","southern","eastern","western","left","right","up","down","here","there"])
+    SHORT_MIN_CHARS = 3
+    _initials_re = re.compile(r'^(?:[A-Z]\.){1,3}$')
+    _digits_re = re.compile(r'\d')
+
+    for _, row in chap_df.iterrows():
+        chap = row['chapter']
+        text = row['text'] or ""
+        doc = nlp(text)
+        for ent in doc.ents:
+            if ent.label_ not in ("GPE","LOC","FAC"):
+                continue
+            raw = ent.text.strip()
+            candidate = re.sub(r'\s+', ' ', raw).strip(" \t\n\r,.;:()[]\"'")
+            low = candidate.lower()
+            if len(candidate) < SHORT_MIN_CHARS:
+                continue
+            if _initials_re.match(candidate):
+                continue
+            if _digits_re.search(candidate):
+                continue
+            if low in DIRECTIONAL:
+                continue
+            if low in {"and","the","that","this","there","here","it","i","we","you","he","she","they"}:
+                continue
+            # do not over-normalize proper names: keep as-is but strip extra spaces
+            rows.append({"place": candidate, "chapter": int(chap) if not pd.isna(chap) else 0})
+
+# write outputs (even if empty)
+places_by_ch = pd.DataFrame(rows, columns=["place","chapter"])
+places_by_ch.to_csv(OUTPUT_PLACES_BY_CH, index=False, encoding="utf-8")
+if not places_by_ch.empty:
+    place_counts = places_by_ch['place'].value_counts().reset_index()
+    place_counts.columns = ['place','count']
+    place_counts.to_csv(OUTPUT_PLACE_COUNTS, index=False, encoding="utf-8")
+
+    places_per_ch = places_by_ch.groupby(['place','chapter'], dropna=False).size().reset_index(name='count')
+    places_per_ch.to_csv(OUTPUT_PLACES_PER_CH, index=False, encoding="utf-8")
+    places_per_ch.to_json(OUTPUT_PLACES_JSON, orient="records", force_ascii=False)
+else:
+    pd.DataFrame(columns=["place","count"]).to_csv(OUTPUT_PLACE_COUNTS, index=False, encoding="utf-8")
+    pd.DataFrame(columns=["place","chapter","count"]).to_csv(OUTPUT_PLACES_PER_CH, index=False, encoding="utf-8")
+
+logging.info("NER extraction complete — wrote CSVs (or empty skeletons).")
+```
+
+```{python}
+#| label: prepare_geodata_for_plotly
+#| echo: false
+#| eval: true
+#| cache: true
+#| freeze: auto
+#| warning: false
+#| error: false
+
+GEOCODE_CSV = DATA_DIR / "places_geocoded.csv"         # produced by a separate geocoding step
+PLACES_PER_CH_RAW = DATA_DIR / "places_per_chapter_raw.csv"
+OUT_CSV = DATA_DIR / "places_per_chapter.csv"
+SUSPECT_CSV = DATA_DIR / "geocode_suspect_manual_review_needed.csv"
+
+if not GEOCODE_CSV.exists():
+    logging.warning(f"{GEOCODE_CSV} not found. Geocoding step must run separately. Skipping geodata preparation.")
+else:
+    geocoded = pd.read_csv(GEOCODE_CSV)
+    if not PLACES_PER_CH_RAW.exists():
+        raise FileNotFoundError("Run ner_spacy_per_chapter to produce places_per_chapter_raw.csv before preparing geodata.")
+    places_per_ch = pd.read_csv(PLACES_PER_CH_RAW)
+
+    geo_counts = places_per_ch.merge(geocoded, on="place", how="left")
+    missing_coords = geo_counts[geo_counts['lat'].isna() | geo_counts['lon'].isna()]
+    if not missing_coords.empty:
+        logging.warning(f"{len(missing_coords)} place x chapter rows missing coordinates. See data/geocode_missing_coords.csv")
+        missing_coords.to_csv(DATA_DIR / "geocode_missing_coords.csv", index=False, encoding="utf-8")
+
+    suspect_rows = []
+    euro_keywords = {"Transylvania","Bistritz","Bistrita","Romania","Bukovina","Klausenburgh","Borgo"}
+    for _, r in geo_counts.iterrows():
+        place = r.get("place")
+        lat = r.get("lat")
+        lon = r.get("lon")
+        if pd.isna(lat) or pd.isna(lon):
+            continue
+        if any(k.lower() in str(place).lower() for k in euro_keywords):
+            try:
+                if not (-30 <= float(lon) <= 60):
+                    suspect_rows.append({**r, "reason":"euro_name_geocoded_outside_europe"})
+            except Exception:
+                continue
+    if suspect_rows:
+        pd.DataFrame(suspect_rows).to_csv(SUSPECT_CSV, index=False, encoding="utf-8")
+        logging.info(f"Wrote {len(suspect_rows)} suspect geocodes to {SUSPECT_CSV}")
+
+    geo_counts = geo_counts.dropna(subset=["lat","lon"]).copy()
+    geo_counts['lat'] = pd.to_numeric(geo_counts['lat'], errors='coerce')
+    geo_counts['lon'] = pd.to_numeric(geo_counts['lon'], errors='coerce')
+    geo_counts['count'] = pd.to_numeric(geo_counts['count'], errors='coerce').fillna(0).astype(int)
+    geo_counts['chapter'] = pd.to_numeric(geo_counts['chapter'], errors='coerce').fillna(0).astype(int)
+
+    agg_all = geo_counts.groupby(['place','lat','lon'], as_index=False)['count'].sum()
+    agg_all['chapter'] = 0
+
+    final = pd.concat([agg_all, geo_counts], ignore_index=True, sort=False)
+    final = final[['place','lat','lon','chapter','count']].sort_values(['chapter','count'], ascending=[True,False])
+    final.to_csv(OUT_CSV, index=False, encoding="utf-8")
+    logging.info(f"Wrote merged per-chapter geodata to {OUT_CSV} ({len(final)} rows).")
+
+```
+```{python}
+#| label: plotly_bubble_map
+#| echo: false
+#| eval: true
+#| cache: true
+#| freeze: auto
+#| warning: false
+#| error: false
+
+DATA_CSV = DATA_DIR / "places_per_chapter.csv"
+if not DATA_CSV.exists():
+    logging.warning("places_per_chapter.csv not present; run prepare_geodata_for_plotly first.")
+else:
+    import plotly.express as px
+
+    df = pd.read_csv(DATA_CSV)
+    df = df.dropna(subset=['lat','lon'])
+    df['count'] = pd.to_numeric(df['count'], errors='coerce').fillna(0).astype(int)
+    df['chapter'] = pd.to_numeric(df['chapter'], errors='coerce').fillna(0).astype(int)
+
+    # compute numeric chapter order for animation and a display label
+    chapter_order = sorted(df['chapter'].unique().tolist())
+    df['chapter_label'] = df['chapter'].apply(lambda c: "All chapters" if c == 0 else f"Chapter {int(c)}")
+
+    max_count = df['count'].max() if not df.empty else 1
+    desired_max_size = 60
+    sizeref = 2.0 * max_count / (desired_max_size ** 2) if max_count > 0 else 1
+
+    fig = px.scatter_geo(df,
+                         lat='lat', lon='lon',
+                         size='count',
+                         hover_name='place',
+                         hover_data={'count': True, 'chapter': True, 'chapter_label': True},
+                         animation_frame='chapter',           # numeric ensures correct ordering
+                         category_orders={'chapter': chapter_order},
+                         projection='natural earth',
+                         title="Geographic distribution of place references in Dracula (bubble size = mentions)")
+    # set explicit sizeref on traces/frames
+    if hasattr(fig, "frames") and fig.frames:
+        for frame in fig.frames:
+            for trace in frame.data:
+                try:
+                    trace.marker.sizeref = sizeref
+                except Exception:
+                    pass
+    for trace in fig.data:
+        try:
+            trace.marker.sizeref = sizeref
+        except Exception:
+            pass
+
+    fig.update_layout(height=600, margin=dict(l=10, r=10, t=60, b=10), template="plotly_white")
+    # control animation speed gracefully (if controls exist)
+    try:
+        fig.layout.updatemenus[0].buttons[0].args[1]['frame']['duration'] = 800
+        fig.layout.updatemenus[0].buttons[0].args[1]['transition']['duration'] = 300
+    except Exception:
+        pass
+
+    fig.show()
+
+```

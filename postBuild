@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -e
+
+echo "Running postBuild: installing spaCy model and NLTK data..."
+
+# spaCy small English model
+python -m spacy download en_core_web_sm
+
+# NLTK data needed by the notebook
+python - <<'PY'
+import nltk
+nltk.download('punkt')
+nltk.download('vader_lexicon')
+nltk.download('stopwords')
+PY
+
+echo "postBuild complete."

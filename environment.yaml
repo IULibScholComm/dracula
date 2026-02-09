@@ -1,0 +1,19 @@
+name: dracula-text-analysis
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - jupyterlab
+  - ipykernel
+  - pip
+  - pip:
+      - pandas
+      - plotly
+      - ipywidgets
+      - nltk
+      - spacy
+      - geopy
+      - folium
+      - nbformat
+
+
