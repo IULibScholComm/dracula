@@ -174,44 +174,65 @@ chap_lemmas_df = load_or_compute_lemmas(chap_df, force_recompute=FORCE_RECOMPUTE
 #| label: widgets_termfreq_lemmatized
 #| echo: false
 #| eval: true
-#| cache: false
+#| cache: true
 #| warning: false
 #| error: false
 
 """
 Interactive lemmatized term-frequency widget for Binder/Jupyter.
 
-Behavior:
-- In an interactive Jupyter environment (Binder), shows a text box + button.
-  The user types a word or phrase and clicks Plot (or presses Enter) to produce a line plot.
-- In a non-interactive static render, prints a short message explaining how to use it in Binder.
+Single-word queries only (lemmatized forms). For Quarto static renders we print
+instructions explaining how to use the widget in Binder.
 """
 
 import logging
 import re
 import pandas as pd
+from collections import Counter
 
 # Defensive checks
 if "chap_lemmas_df" not in globals():
     raise RuntimeError("chap_lemmas_df not found — run the chapter/lemma cells before this one.")
 
-# Helper functions (same as earlier)
+# --------------------------------------------------
+# Precompute per-chapter lemma counters (single-word only)
+# --------------------------------------------------
+_chapter_counters = []
+_chapter_word_counts = chap_lemmas_df["word_count"].astype(int).tolist()
+
+# Build list of lemma strings to keep ordering stable for plotting
+_lemma_strings_list = chap_lemmas_df["lemmas_str"].fillna("").astype(str).tolist()
+
+for s in _lemma_strings_list:
+    if not s:
+        _chapter_counters.append(Counter())
+    else:
+        _chapter_counters.append(Counter(s.split()))
+
+# Helper functions
 def lemmatize_query_simple(q: str):
     q = q.strip().lower()
     if not q:
         return []
     return re.findall(r"[a-z]+", q)
 
-def count_lemma_sequence(lemmas, lemma_strings):
-    if not lemmas:
-        return [0] * len(lemma_strings)
-    seq = r"\s+".join(re.escape(l) for l in lemmas)
-    pattern = re.compile(rf"\b{seq}\b", flags=re.IGNORECASE)
-    return [len(pattern.findall(s)) if isinstance(s, str) else 0 for s in lemma_strings]
+def count_single_lemma(word: str):
+    """
+    Count a single lemmatized word per chapter.
+    Extremely fast: Counter lookup per chapter.
+    """
+    w = word.strip().lower()
+    if not w:
+        return [0] * len(_chapter_counters)
+    return [c.get(w, 0) for c in _chapter_counters]
 
 def make_plot_df(lemmas_str_df: pd.DataFrame, query: str, normalize: bool = False):
     lemmas = lemmatize_query_simple(query)
-    counts = count_lemma_sequence(lemmas, lemmas_str_df["lemmas_str"].tolist())
+    if len(lemmas) != 1:
+        # enforce single-word queries — return empty DataFrame to signal nothing to plot
+        return pd.DataFrame()
+
+    counts = count_single_lemma(lemmas[0])
 
     plot_df = pd.DataFrame({
         "chapter": lemmas_str_df["chapter"].astype(int).tolist(),
@@ -237,18 +258,17 @@ try:
     import plotly.express as px
     INTERACTIVE = True
 except Exception:
-    # Not running in a widget-capable environment (static Quarto render); we'll show an explanatory message below.
     INTERACTIVE = False
 
 if not INTERACTIVE:
     # Non-interactive build: show brief instructions for Binder usage
-    print("This page includes an interactive term-frequency widget. To use it, launch this Quarto project in Binder (see project README or https://quarto.org/docs/projects/binder.html).")
-    print("In Binder's Jupyter interface, open this notebook and type a word or phrase into the textbox, then click Plot.")
+    print("This page includes an interactive term-frequency widget. To use it, launch this Quarto project in Binder (see project README).")
+    print("In Binder's Jupyter interface, open this notebook and type a single lemmatized word (e.g., 'vampire'), then click Plot.")
 else:
     # Build UI: text input + normalize checkbox + plot area + helpful instructions
     term_input = widgets.Text(
         value="",
-        placeholder="Type a word or phrase (e.g. vampire)",
+        placeholder="Type a single word (e.g. vampire)",
         description="Term:",
         layout=widgets.Layout(width="60%")
     )
@@ -264,14 +284,21 @@ else:
 
     def render_plot_for_query(query_text, normalize=False):
         """
-        Build and show a plotly figure for the given query_text.
+        Build and show a plotly figure for the given single-word query_text.
         Returns True if successful, False if nothing to show.
         """
         q = query_text.strip()
         if not q:
             with out:
                 clear_output(wait=True)
-                print("Please enter a word or phrase to plot.")
+                print("Please enter a single lemmatized word to plot.")
+            return False
+
+        lemmas = lemmatize_query_simple(q)
+        if len(lemmas) != 1:
+            with out:
+                clear_output(wait=True)
+                print("Please enter a single word (phrases are not supported).")
             return False
 
         plot_df = make_plot_df(chap_lemmas_df, q, normalize=normalize)
@@ -307,11 +334,6 @@ else:
     def on_click_btn(b):
         render_plot_for_query(term_input.value, normalize_chk.value)
 
-    def on_submit_enter(change):
-        # only react when Enter pressed (the change type is 'submit' in ipywidgets, but Text doesn't send submit in all versions)
-        # a common pattern: react when value changes but user expects Enter; we'll bind to .on_submit if available
-        pass
-
     plot_btn.on_click(on_click_btn)
 
     # bind Enter key if Text has on_submit (ipykernel >= ?)
@@ -329,7 +351,6 @@ else:
     # Optionally show a short hint / example
     with out:
         print("Type a word (e.g., 'vampire') and click Plot. Press Enter in the textbox where supported.")
-
 
 ```
 
@@ -379,7 +400,7 @@ fig.show()
 
 # Interactive ipywidgets UI if available (same pattern as above)
 if INTERACTIVE:
-    term_input = widgets.Text(value="vampire", placeholder="Type a word or phrase...", description="Term:", layout=widgets.Layout(width="60%"))
+    term_input = widgets.Text(value="vampire", placeholder="Type a word ...", description="Term:", layout=widgets.Layout(width="60%"))
     normalize_chk = widgets.Checkbox(value=False, description="Normalize (per 1k words)", indent=False)
     stopwords_chk = widgets.Checkbox(value=False, description="Remove simple stopwords", indent=False)
     submit_btn = widgets.Button(description="Plot", button_style="primary")
@@ -479,7 +500,7 @@ else:
 ```{python}
 #| label: ner_spacy_per_chapter
 #| echo: false
-#| eval: true
+#| eval: false
 #| cache: true
 #| freeze: auto
 #| warning: false
@@ -550,7 +571,7 @@ logging.info("NER extraction complete — wrote CSVs (or empty skeletons).")
 ```{python}
 #| label: prepare_geodata_for_plotly
 #| echo: false
-#| eval: true
+#| eval: false
 #| cache: true
 #| freeze: auto
 #| warning: false

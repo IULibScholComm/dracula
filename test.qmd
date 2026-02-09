@@ -1,9 +1,0 @@
----
-title: "Quarto + Python Test"
----
-
-This is a minimal test to confirm that Quarto can execute Python code.
-
-```{python}
-print("Hello from Python inside Quarto!")
-```

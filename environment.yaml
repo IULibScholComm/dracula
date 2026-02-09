@@ -15,5 +15,6 @@ dependencies:
       - geopy
       - folium
       - nbformat
+      - jupyter-cache
 
 

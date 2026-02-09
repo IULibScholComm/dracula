@@ -1,148 +1,142 @@
-place,lat,lon,source,note
-London,51.5074456,-0.1277653,nominatim,
-Carfax,51.7519783,-1.2579335,nominatim,
-Varna,43.2073873,27.9166653,nominatim,
-Transylvania,46.0,25.0,override,"region center, Romania"
-Amsterdam,52.3730796,4.8924534,nominatim,
-Slovaks,49.6304791,25.1399331,nominatim,
-England,52.5310214,-1.2649062,nominatim,
-Bukovina,49.2974402,16.7732698,nominatim,
-the Borgo Pass,53.5549463,-1.4814004,nominatim,
-Hillingham,39.8681486,-75.6515297,nominatim,
-Abbey,50.7345503,-108.7579928,nominatim,
-the East Cliff,51.0990199,1.2056714,nominatim,
-Turkey,39.294076,35.2316631,nominatim,
-Piccadilly,51.5093856,-0.1359413,nominatim,
-the Black Sea,52.0687719,4.2778376,nominatim,
-Dardanelles,40.2091726,26.4413908,nominatim,
-M.D.,18.4898458,-69.8033224,nominatim,
-Mina,42.130056,-79.688104,nominatim,
-Seward,37.1850331,-100.8928434,nominatim,
-Vampire,50.7022495,4.5918613,nominatim,
-East,3.9894393,14.178373,nominatim,
-Magyar,47.1817585,19.5060937,nominatim,
-Slovak,46.1514172,14.9383436,nominatim,
-Greenland,77.6192349,-42.8125967,nominatim,
-Ste,13.0368003,80.2464194,nominatim,
-Renfield,52.9419608,1.1337933,nominatim,
-the Green Park,51.5044559,-0.1437172,nominatim,
-Madam Mina,22.5425143,88.3592002,nominatim,
-Castle,51.6247029,-3.9454009,nominatim,
-Veresti,47.6069649,26.4396175,nominatim,
-the United States,47.8291375,-122.5970742,nominatim,
-Europe,51.0,10.0,nominatim,
-Attila,37.7697714,-88.7711732,nominatim,
-China,35.000074,104.999927,nominatim,
-France,46.603354,1.8883335,nominatim,
-Germany,51.1638175,10.4478313,nominatim,
-Texas,31.2638905,-98.5456116,nominatim,
-the East Pier,54.2825349,-0.3870523,nominatim,
-Tate Hill Pier,54.4894585,-0.6127467,nominatim,
-Scotland,56.7861112,-4.1140518,nominatim,
-Purfleet,-31.9433333,152.4675,nominatim,
-America,39.7837304,-100.445882,nominatim,
-Paddington,51.5161629,-0.1744856,nominatim,
-South,18.2612839,-73.8444985,nominatim,
-India,22.3511148,78.6677428,nominatim,
-Bloxam,53.9214386,-130.1386338,nominatim,
-Hildesheim,52.1527188,9.9518083,nominatim,
-Vienna,48.2083537,16.3725042,nominatim,
-West,18.7668687,-72.4387315,nominatim,
-the Hotel Royale,0.3189383,32.5854411,nominatim,
-Moldavia,47.2879608,28.5670941,nominatim,
-east,3.9894393,14.178373,nominatim,
-St. George’s Day,52.0459799,-0.7467318,nominatim,
-Borgo Prund,47.2201539,24.7406598,nominatim,
-Tokay,33.8736776,-106.7391847,nominatim,
-china,35.000074,104.999927,nominatim,
-Iceland,64.9841821,-18.1059013,nominatim,
-Asia,51.2086975,89.2343748,nominatim,
-Africa,11.5024338,17.7578122,nominatim,
-Scythia,37.8219963,-86.9052698,nominatim,
-Bulgar,15.4454424,26.3768271,nominatim,
-Honfoglalas,46.1623381,18.3532511,nominatim,
-Newcastle,54.9738474,-1.6131572,nominatim,
-Dover,51.1251275,1.3134228,nominatim,
-Hungary,47.1817585,19.5060937,nominatim,
-ark,35.2048883,-92.4479108,nominatim,
-Bistritz,47.1333,24.4833,override,"Bistrița, Romania (historic Bistritz)"
-Chatham Street,51.4923888,-0.0899107,nominatim,
-n’t,37.9456724,23.7139908,nominatim,
-Desdemona,32.270414,-98.5503301,nominatim,
-wasn’t,41.3106743,69.3268267,nominatim,
-Marquesas,-9.7793255,-139.0067835,nominatim,
-Titicaca,-15.7334907,-69.9357769,nominatim,
-Korea,36.638392,127.6961188,nominatim,
-Nuremberg,49.453872,11.077298,nominatim,
-York,53.9656579,-1.0743052,nominatim,
-Leeds,53.7974185,-1.5437941,nominatim,
-East Cliff,51.3361267,1.4285146,nominatim,
-R.A.,-3.0557909,-60.0544946,nominatim,
-R.I.,41.7962409,-71.5992372,nominatim,
-the West Cliff,50.7210023,-1.8786142,nominatim,
-S.P.C.A.,48.8634445,-123.5218794,nominatim,
-East wind,45.5123192,-122.4024335,nominatim,
-Archipelago,38.0622276,25.7205887,nominatim,
-Gibraltar,36.1285933,-5.3474761,nominatim,
-Straits,34.729051,-76.5710368,nominatim,
-the Bay of,7.4929263,-58.7794688,nominatim,
-Biscay,43.238482,-2.8516316,nominatim,
-North Foreland,51.3781622,1.4487445,nominatim,
-the North Sea,55.7355049,9.1283737,nominatim,
-Mackenzie,38.5809508,-90.3164013,nominatim,
-the West Pier,54.282977,-0.391772,nominatim,
-Great Northern Railway,53.8578955,-6.4955776,nominatim,
-the West Lighthouse,52.0672434,4.3246748,nominatim,
-Morpheus,59.3243283,18.0703653,nominatim,
-Hamburg,53.550341,10.000654,nominatim,
-Wilhelmina,53.2428079,6.5685752,nominatim,
-coma,48.2491446,19.887084,nominatim,
-the Great Eastern Hotel,22.5684154,88.3495141,nominatim,
-Holmwood,51.1811282,-0.320874,nominatim,
-Dame Nature,50.8368552,4.3620661,nominatim,
-Floridas,57.1879768,27.0605473,nominatim,
-Ophelia,37.9101284,-76.2835554,nominatim,
-Superintendent,33.9739182,-94.2878786,nominatim,
-Norway,61.1529386,8.7876653,nominatim,
-Zoo,52.3855297,9.7729005,nominatim,
-Antwerp,51.2211097,4.3997081,nominatim,
-M.R.C.S.,-34.6360064,-58.4696042,nominatim,
-Hyde Park Corner,51.5027264,-0.1543249,nominatim,
-the Shooter’s Hill,51.4861237,-1.09021,nominatim,
-Later._--He,52.3845044,4.5422888,nominatim,
-Holland,52.2434979,5.6343227,nominatim,
-the North Hospital,40.8803581,-73.8813965,nominatim,
-Straightway,41.6452779,-70.3117833,nominatim,
-Eastern Europe,-33.8234977,25.6291504,nominatim,
-the Berkeley Hotel,53.5907249,-0.6846355,nominatim,
-Underground,43.2258226,5.3686422,nominatim,
-Fenchurch Street,51.5116463,-0.0836295,nominatim,
-Jerusalem,31.7788472,35.2257856,nominatim,
-Greece,38.9953683,21.9877132,nominatim,
-Rome,41.8933203,12.4829321,nominatim,
-Van Helsing,51.6224203,6.9756612,nominatim,
-Chicksand Street,51.5183855,-0.0701749,nominatim,
-Jamaica Lane,32.7376363,-97.2747641,nominatim,
-Bartel Street,32.7904893,-117.1288116,nominatim,
-Cross Angel Street,51.5390659,-0.0996269,nominatim,
-Berkeley,37.8708393,-122.272863,nominatim,
-Sackville Street,51.5088497,-0.1376547,nominatim,
-Malvolio,-34.1054305,150.7892098,nominatim,
-Breakfast,55.7579096,37.5973729,nominatim,
-Arlington Street,51.5071834,-0.1410021,nominatim,
-Death,36.4228722,-116.913718,nominatim,
-the hall:--,39.7701985,-86.1529514,nominatim,
-Port of London,51.5093935,0.0350079,nominatim,
-Black-Sea,43.872824,33.9938077,nominatim,
-Frenchmen,51.1717799,-58.4426909,nominatim,
-Paris,48.8588897,2.320041,nominatim,
-Kúkri,23.5117185,76.3661172,nominatim,
-Bucharest,44.4361414,26.102684,nominatim,
-the Great River,-34.0425,22.2313889,nominatim,
-Galatz,45.4338215,28.0549395,nominatim,
-Consul,52.4813269,-1.9054517,nominatim,
-Hapgood,43.2263507,-72.9368997,nominatim,
-St. Peter,48.01786,8.0358335,nominatim,
-Borgo,46.0533463,11.4566004,nominatim,
-Fundu,3.055329,31.442704,nominatim,
-Rapids,43.0957985,-78.6545955,nominatim,
+place,lat,lon,raw
+London,51.5074456,-0.1277653,"Greater London, England, United Kingdom"
+Carfax,51.7519783,-1.2579335,"Carfax, St Thomas', City Centre, Oxford, Oxfordshire, England, OX1 3HY, United Kingdom"
+Varna,43.2073873,27.9166653,"Варна, Одесос, Варна, България"
+Transylvania,35.1982216,-82.7724889,"Transylvania County, North Carolina, United States"
+Amsterdam,52.3730796,4.8924534,"Amsterdam, Noord-Holland, Nederland"
+Slovaks,49.6304791,25.1399331,"Пам'ятник полеглим чехам та словакам у Зборівській битві, Чехословацька вулиця, Калинівка, Зборівська міська громада, Тернопільський район, Тернопільська область, 47204, Україна"
+England,52.5310214,-1.2649062,"England, United Kingdom"
+Bukovina,49.2974402,16.7732698,"Bukovina, okres Blansko, Jihomoravský kraj, Jihovýchod, Česko"
+the Borgo Pass,53.5549463,-1.4814004,"The Picture House, Dow Passage, Oakwell, Kingstone, Barnsley, South Yorkshire, England, S70 2EX, United Kingdom"
+Hillingham,39.8681486,-75.6515297,"Hillingham Circle, Hamorton, Kennett Township, Chester County, Pennsylvania, 19317, United States"
+Abbey,50.7345503,-108.7579928,"Abbey, Saskatchewan, S0N 0A0, Canada"
+the East Cliff,51.0990199,1.2056714,"The Wing, New Dover Road, East Cliff, Capel-le-Ferne, Dover, Kent, England, CT18 7JJ, United Kingdom"
+Turkey,39.294076,35.2316631,Türkiye
+Piccadilly,51.5093856,-0.1359413,"Piccadilly, St. James's, Westminster, Mayfair, City of Westminster, Greater London, England, W1J 0LA, United Kingdom"
+the Black Sea,52.0687719,4.2778376,"Black Sea, Loosduinsekade, Oostbroek-Noord, Rustenburg en Oostbroek, Escamp, Den Haag, Zuid-Holland, Nederland, 2571 CE, Nederland"
+Dardanelles,40.2091726,26.4413908,"Çanakkale Boğazı, Çanakkale, Marmara Bölgesi, Türkiye"
+M.D,18.4898458,-69.8033224,"Manzana D, Ciudad Real Oriental, Juan López, Santo Domingo Este, Santo Domingo, 03006, República Dominicana"
+Mina,42.130056,-79.688104,"Town of Mina, Chautauqua County, New York, 14736, United States"
+Seward,37.1850331,-100.8928434,"Seward County, Kansas, United States"
+Vampire,50.7022495,4.5918613,"Vampire, Boulevard de l'Europe, Limal, Wavre, Nivelles, Brabant wallon, Wallonie, 1300, België / Belgique / Belgien"
+Magyar,47.1817585,19.5060937,Magyarország
+Slovak,46.1514172,14.9383436,"Slovak, Zagorje ob Savi, 1412, Slovenija"
+Greenland,77.6192349,-42.8125967,Kalaallit Nunaat
+Ste,13.0368003,80.2464194,"தேனாம்பேட்டை, Teynampet - Saidapet steel flyover, CMWSSB Division 122, Ward 122, Zone 9 Teynampet, Chennai Corporation, Chennai, Tamil Nadu, 600035, India"
+Renfield,52.9419608,1.1337933,"Renfield, The Street, Weybourne, North Norfolk, Norfolk, England, NR25 7EH, United Kingdom"
+the Green Park,51.5044559,-0.1437172,"The Green Park, Belgravia, City of Westminster, Greater London, England, United Kingdom"
+Madam Mina,22.5425143,88.3592002,"Madam Curie Place, Ripon Street, Kolkata, Kolkata Metropolitan Area, Kolkata, West Bengal, 700017, India"
+Castle,51.6247029,-3.9454009,"Castle, Swansea, Cymru / Wales, United Kingdom"
+Veresti,47.6069649,26.4396175,"Verești, Suceava, România"
+the United States,47.8291375,-122.5970742,"Buzzcut, Kitsap County, Washington, 98364, United States"
+Europe,51.0,10.0,Europe
+Attila,37.7697714,-88.7711732,"Attila, Williamson County, Illinois, United States"
+China,35.000074,104.999927,中国
+France,46.603354,1.8883335,France
+Germany,51.1638175,10.4478313,Deutschland
+Texas,31.2638905,-98.5456116,"Texas, United States"
+the East Pier,54.2825349,-0.3870523,"East  Pier, The Old Town, Scarborough, North Yorkshire, York and North Yorkshire, England, YO11 1PJ, United Kingdom"
+Tate Hill Pier,54.4894585,-0.6127467,"Tate Hill Pier, Tate Hill, Whitby, North Yorkshire, York and North Yorkshire, England, YO22 4DL, United Kingdom"
+Scotland,56.7861112,-4.1140518,"Alba / Scotland, United Kingdom"
+Purfleet,-31.9433333,152.4675,"Purfleet, Mid-Coast Council, New South Wales, 2430, Australia"
+America,39.7837304,-100.445882,United States
+Paddington,51.5161629,-0.1744856,"Paddington, City of Westminster, Greater London, England, W2 1HU, United Kingdom"
+India,22.3511148,78.6677428,India
+Bloxam,53.9214386,-130.1386338,"Bloxam Island, Area C (South Skeena), North Coast Regional District, British Columbia, Canada"
+Hildesheim,52.1527188,9.9518083,"Hildesheim, Landkreis Hildesheim, Niedersachsen, Deutschland"
+Vienna,48.2083537,16.3725042,"Wien, Österreich"
+the Hotel Royale,0.3189383,32.5854411,"Imperial Royale Hotel, Kintu Road, Nakasero, Central, Kampala Capital City, Kampala, Uganda"
+Moldavia,47.2879608,28.5670941,Moldova
+St. George’s Day,52.0459799,-0.7467318,"St George's Day, Off Road Cycle Track, Central Milton Keynes, Milton Keynes, City of Milton Keynes, England, MK9 3FP, United Kingdom"
+Borgo Prund,47.2201539,24.7406598,"Prundu Bârgăului, Bistrița-Năsăud, 427231, România"
+Tokay,33.8736776,-106.7391847,"Tokay, Socorro County, New Mexico, United States"
+china,35.000074,104.999927,中国
+Iceland,64.9841821,-18.1059013,Ísland
+Asia,51.2086975,89.2343748,亚洲
+Africa,11.5024338,17.7578122,Afrika / أفريقيا
+Scythia,37.8219963,-86.9052698,"Scythia, Daviess County, Kentucky, United States"
+Bulgar,15.4454424,26.3768271,"Bulgar, Mellit, شمال دارفور, السودان"
+Honfoglalas,46.1623381,18.3532511,"Honfoglalás, Fő utca, Hosszúhetény, Pécsi járás, Baranya vármegye, Dél-Dunántúl, Dunántúl, 7694, Magyarország"
+Newcastle,54.9738474,-1.6131572,"Newcastle upon Tyne, Tyne and Wear, North East, England, United Kingdom"
+Dover,51.1251275,1.3134228,"Dover, Kent, England, United Kingdom"
+Hungary,47.1817585,19.5060937,Magyarország
+ark,35.2048883,-92.4479108,"Arkansas, United States"
+Bistritz,47.1327012,24.4963949,"Bistrița, Bistrița-Năsăud, România"
+Chatham Street,51.4923888,-0.0899107,"Chatham Street, Browning Estate, Walworth, London Borough of Southwark, Greater London, England, SE17 1NY, United Kingdom"
+n’t,37.9456724,23.7139908,"N&T, Ομήρου, Νέα Σμύρνη, Δήμος Νέας Σμύρνης, Περιφερειακή Ενότητα Νοτίου Τομέα Αθηνών, Περιφέρεια Αττικής, Αποκεντρωμένη Διοίκηση Αττικής, 171 21, Ελλάς"
+Desdemona,32.270414,-98.5503301,"Desdemona, Eastland County, Texas, 76445, United States"
+wasn’t,41.3106743,69.3268267,"Wasn inn, Oltintepa ko'chasi, Doʻstobod mahallasi, Boyqoʻrgʻon mahallasi, Yashnobod Tumani, Toshkent shahri, 100000, Oʻzbekiston"
+Marquesas,-9.7793255,-139.0067835,"Îles Marquises, Polynésie Française, France"
+Titicaca,-15.7334907,-69.9357769,"Reserva Nacional del Titicaca, Puno, Perú"
+Korea,36.638392,127.6961188,대한민국
+Nuremberg,49.453872,11.077298,"Nürnberg, Bayern, Deutschland"
+York,53.9656579,-1.0743052,"York, York and North Yorkshire, England, United Kingdom"
+Leeds,53.7974185,-1.5437941,"Leeds, West Yorkshire, England, United Kingdom"
+East Cliff,51.3361267,1.4285146,"East Cliff, Ramsgate, Broadstairs, Thanet, Kent, England, CT11 8NB, United Kingdom"
+R.A,-3.0557909,-60.0544946,"Condomínio Residencial Bordeaux, Planalto, Manaus, Região Geográfica Imediata de Manaus, Região Geográfica Intermediária de Manaus, Amazonas, Região Norte, 69000-000, Brasil"
+R.I,41.7962409,-71.5992372,"Rhode Island, United States"
+the West Cliff,50.7210023,-1.8786142,"Catholic Church of the Sacred Heart, 1, Albert Road, West Cliff, Bournemouth, Bournemouth, Christchurch and Poole, England, BH1 1AX, United Kingdom"
+S.P.C.A,48.8634445,-123.5218794,"S.P.C.A, Sharp Road, Ganges, Salt Spring Island Electoral Area, Capital Regional District, British Columbia, V8K 2N8, Canada"
+East wind,45.5123192,-122.4024335,"East Wind, 2950, Northeast, Gresham, Multnomah County, Oregon, 97030, United States"
+Archipelago,38.0622276,25.7205887,Αιγαίον Πέλαγος / Ege Denizi
+Gibraltar,36.1285933,-5.3474761,Gibraltar
+Straits,34.729051,-76.5710368,"Straits, Carteret County, North Carolina, 28528, United States"
+the Bay of,7.4929263,-58.7794688,"The Bay, Rest of Region 2, Pomeroon-Supenaam, Guyana"
+Biscay,43.238482,-2.8516316,"Bizkaia, Euskadi, España"
+North Foreland,51.3781622,1.4487445,"North Foreland, Kingsgate, Broadstairs and St Peters, Broadstairs, Thanet, Kent, England, CT10 3QU, United Kingdom"
+the North Sea,55.7355049,9.1283737,"Nordsøen, Billund, Billund Kommune, Region Syddanmark, Danmark"
+Mackenzie,38.5809508,-90.3164013,"Mackenzie, Saint Louis County, Missouri, United States"
+the West Pier,54.282977,-0.391772,"West Pier, The Old Town, Scarborough, North Yorkshire, York and North Yorkshire, England, YO11 1PD, United Kingdom"
+Great Northern Railway,53.8578955,-6.4955776,"Great Northern Railway (Ireland), Ardee Rural ED, The Municipal District of Ardee, County Louth, Leinster, A92 AC62, Éire / Ireland"
+the West Lighthouse,52.0672434,4.3246748,"Lighthouse, 75, Johanna Westerdijkplein, Laakhaven-Oost, Laak, Den Haag, Zuid-Holland, Nederland, 2521 EN, Nederland"
+Morpheus,59.3243283,18.0703653,"Morpheus, Gamla stan, Södermalms stadsdelsområde, Stockholm, Stockholms kommun, Stockholms län, 111 29, Sverige"
+Hamburg,53.550341,10.000654,"Hamburg, Deutschland"
+Wilhelmina,53.2428079,6.5685752,"Wilhelmina, 1, Molenstreek, Noorderhoogebrug, Oost, Groningen, Nederland, 9738 AC, Nederland"
+coma,48.2491446,19.887084,"Čamovce, okres Lučenec, Banskobystrický kraj, Stredné Slovensko, Slovensko"
+the Great Eastern Hotel,22.5684154,88.3495141,"The Lalit Great Eastern Kolkata, Old Court House Street, B. B. D. Bagh, Kolkata, Kolkata Metropolitan Area, Kolkata, West Bengal, 700069, India"
+Holmwood,51.1811282,-0.320874,"Holmwood, Hawksmoore Drive, Breakspear Farm, Capel, Beare Green, Mole Valley, Surrey, England, RH5 4SE, United Kingdom"
+Dame Nature,50.8368552,4.3620661,"Dame Nature, Galerie Toison d'Or - Galerij Toison d’Or, Matongé, Ixelles - Elsene, Brussel-Hoofdstad - Bruxelles-Capitale, Région de Bruxelles-Capitale - Brussels Hoofdstedelijk Gewest, 1050, België / Belgique / Belgien"
+Floridas,57.1879768,27.0605473,"Floridas, Litenes pagasts, Gulbenes novads, LV-4405, Latvija"
+Ophelia,37.9101284,-76.2835554,"Ophelia, Northumberland County, Virginia, 22530, United States"
+Superintendent,33.9739182,-94.2878786,"Superintendent, Sevier County, Arkansas, 71832, United States"
+Norway,61.1529386,8.7876653,Norge
+Zoo,52.3855297,9.7729005,"Zoo, Mitte, Hannover, Region Hannover, Niedersachsen, 30175, Deutschland"
+Antwerp,51.2211097,4.3997081,"Antwerpen, Vlaanderen, België / Belgique / Belgien"
+M.R.C.S,-34.6360064,-58.4696042,"M&R, Avenida Directorio, Flores, Buenos Aires, Comuna 7, Ciudad Autónoma de Buenos Aires, C1406GST, Argentina"
+Hyde Park Corner,51.5027264,-0.1543249,"Hyde Park Corner, A4, Belgravia, City of Westminster, Greater London, England, SW1X 7LY, United Kingdom"
+the Shooter’s Hill,51.4861237,-1.09021,"The Swan, Shooter's Hill, Pangbourne, West Berkshire, England, RG8 7DU, United Kingdom"
+Later._--He,52.3845044,4.5422888,"Gran Doradobocht, later Kumhobocht, Laarwall, Zandvoort, Noord-Holland, Nederland, 2041 TZ, Nederland"
+Holland,52.2434979,5.6343227,Nederland
+the North Hospital,40.8803581,-73.8813965,"North Central Bronx Hospital, 3424, Kossuth Avenue, The Bronx, Bronx County, New York, 10467, United States"
+Straightway,41.6452779,-70.3117833,"Straightway, Hyannis, Barnstable, Barnstable County, Massachusetts, 02647, United States"
+Eastern Europe,-33.8234977,25.6291504,"Europe Street, Wells Estate, Nelson Mandela Bay Ward 60, Nelson Mandela Bay Metropolitan Municipality, Eastern Cape, 6211, South Africa"
+the Berkeley Hotel,53.5907249,-0.6846355,"The Berkeley Hotel, Doncaster Road, Berkeley Park, Berkeley, Scunthorpe, North Lincolnshire, Greater Lincolnshire, England, DN15 7DS, United Kingdom"
+Underground,43.2258226,5.3686422,"Underground, Marseille 8e Arrondissement, Marseille, Bouches-du-Rhône, Provence-Alpes-Côte d'Azur, France métropolitaine, 13008, France"
+Fenchurch Street,51.5116463,-0.0836295,"Fenchurch Street, Leadenhall Market, Moorgate, City of London, Greater London, England, EC3M 7HJ, United Kingdom"
+Jerusalem,31.7788472,35.2257856,"ירושלים | القدس, נפת ירושלים, מחוז ירושלים, ישראל"
+Greece,38.9953683,21.9877132,Ελλάς
+Rome,41.8933203,12.4829321,"Roma, Roma Capitale, Lazio, Italia"
+Van Helsing,51.6224203,6.9756612,"Van Helsing's Maintenance Area, Speedy Pass Eingang Van Helsing's Factory, Feldhausen, Bottrop, Nordrhein-Westfalen, 46244, Deutschland"
+Chicksand Street,51.5183855,-0.0701749,"Chicksand Street, Spitalfields, Whitechapel, London Borough of Tower Hamlets, Greater London, England, E1 5AE, United Kingdom"
+Jamaica Lane,32.7376363,-97.2747641,"Jamaica Lane, Fort Worth, Tarrant County, Texas, 76103, United States"
+Bartel Street,32.7904893,-117.1288116,"Bartel Street, Serra Mesa, San Diego, San Diego County, California, 92123, United States"
+Cross Angel Street,51.5390659,-0.0996269,"Cross Street Baptist Church, Cross Street, Angel, Islington, London Borough of Islington, Greater London, England, N1 2BH, United Kingdom"
+Berkeley,37.8708393,-122.272863,"Berkeley, Alameda County, California, United States"
+Sackville Street,51.5088497,-0.1376547,"Sackville Street, St. James's, Westminster, Mayfair, City of Westminster, Greater London, England, W1J 9EU, United Kingdom"
+Malvolio,-34.1054305,150.7892098,"Malvolio Street, Rosemeadow, Sydney, Campbelltown City Council, New South Wales, 2560, Australia"
+Breakfast,55.7579096,37.5973729,"Breakfast, Малая Никитская улица, 47, Пресненский район, Москва, Центральный федеральный округ, 121069, Россия"
+Arlington Street,51.5071834,-0.1410021,"Arlington Street, St. James's, Westminster, Mayfair, City of Westminster, Greater London, England, SW1A 1RA, United Kingdom"
+Death,36.4228722,-116.913718,"Death Valley, California, 92328, United States"
+the hall:--,39.7701985,-86.1529514,"The Hall, 202, North Alabama Street, Indianapolis, Marion, Indiana, 46204, United States"
+Port of London,51.5093935,0.0350079,"Port of London, Victoria Dock Road, Custom House, Silvertown, London Borough of Newham, Greater London, England, E16 3HS, United Kingdom"
+Black-Sea,43.872824,33.9938077,Чорне море - Marea Neagră - Черно море – Karadeniz - შავი ზღვა - Чёрное море
+Frenchmen,51.1717799,-58.4426909,"Île Frenchmen, Le Golfe-du-Saint-Laurent, Côte-Nord, Québec, Canada"
+Paris,48.8534951,2.3483915,"Paris, Île-de-France, France métropolitaine, France"
+Kúkri,22.5249745,77.6591242,"Kukri, Dolariya Tahsil, Narmadapuram, Madhya Pradesh, India"
+Bucharest,44.4361414,26.102684,"București, România"
+the Great River,-34.0425,22.2313889,"Groot-Brakrivier, Garden Route District Municipality, Western Cape, 6525, South Africa"
+Galatz,45.4338215,28.0549395,"Galați, România"
+Consul,52.4813269,-1.9054517,"Honorary Consul of the Federal Republic of Germany, 156, Great Charles Street Queensway, Chinese Quarter, Ladywood, Park Central, Birmingham, West Midlands, England, B3 3HS, United Kingdom"
+Hapgood,43.2263507,-72.9368997,"Hapgood State Forest, Peru, Bennington County, Vermont, United States"
+St. Peter,48.01786,8.0358335,"St. Peter, GVV St. Peter, Landkreis Breisgau-Hochschwarzwald, Baden-Württemberg, 79271, Deutschland"
+Rapids,43.0957985,-78.6545955,"Rapids, Town of Lockport, Niagara County, New York, United States"

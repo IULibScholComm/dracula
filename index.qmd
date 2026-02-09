@@ -3,5 +3,3 @@
 This is a Quarto book that uses binder.
 
 To learn more about Quarto books visit <https://quarto.org/docs/books>.
-
-https://mybinder.org/v2/gh/<your-github-username>/<repo-name>/<branch>?urlpath=lab/tree/index.qmd

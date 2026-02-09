@@ -23,7 +23,7 @@ book:
   original-publisher: Archibald Constable and Company
   original-publisher-place: Westminster & Whitehall Gardens
   favicon: Dracula_cover.jpg
-  site-url: https://iulibscholcomm.github.io/computational-scholarly-edition/
+  site-url: https://iulibscholcomm.github.io/dracula/
   search: 
     location: sidebar
     type: textbox
@@ -43,6 +43,8 @@ book:
     pinned: true
     logo: Dracula_cover.jpg
     logo-alt: book cover of Dracula with a yellow background and red title, author, and border
+  repo-url: https://github.com/IULibScholComm/dracula
+  
 
   chapters: 
     - index.qmd
@@ -51,6 +53,7 @@ book:
     - 2.qmd
     - 3.qmd
     - 99-text-analysis.qmd
+  code-links: binder
 
 format:
   html:
