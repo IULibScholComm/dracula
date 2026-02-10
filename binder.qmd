@@ -1,0 +1,88 @@
+---
+title: "Untitled"
+format: html
+---
+
+
+```{python}
+#| label: widgets_termfreq
+#| echo: false
+#| eval: true
+#| cache: false
+#| warning: false
+#| error: false
+
+def counts_for_term(term, df):
+    term = term.strip()
+    if term == "":
+        return [0] * len(df)
+    q = re.escape(term)
+    q = q.replace(r"\ ", r"\s+")
+    pattern = re.compile(rf"\b{q}\b", flags=re.IGNORECASE)
+    counts = []
+    for t in df["text"]:
+        if not isinstance(t, str) or t.strip()=="":
+            counts.append(0)
+        else:
+            counts.append(len(pattern.findall(t)))
+    return counts
+
+plot_df_template = chap_df[chap_df["chapter"] >= 0].sort_values("chapter").copy()
+plot_df_template["word_count"] = plot_df_template["text"].str.split().str.len().fillna(0).astype(int)
+
+# Non-interactive example (Quarto-friendly)
+term = "vampire"
+counts = counts_for_term(term, plot_df_template)
+df_plot = pd.DataFrame({
+    "chapter": plot_df_template["chapter"].astype(int),
+    "count": counts,
+    "marker": plot_df_template.get("marker", plot_df_template["chapter"].astype(str))
+}).sort_values("chapter")
+df_plot = df_plot[df_plot["chapter"] > 0]
+df_plot["norm_per_1k"] = df_plot["count"] / (plot_df_template.loc[df_plot.index, "word_count"].replace({0:1}) / 1000)
+
+# Static example: show raw counts line
+import plotly.express as px
+fig = px.line(df_plot, x="chapter", y="count", markers=True, title=f"Frequency of “{term}” by chapter",
+              labels={"chapter":"Chapter","count":"Raw occurrences"})
+fig.update_layout(height=420, xaxis=dict(dtick=1), margin=dict(l=40,r=20,t=60,b=40))
+fig.show()
+
+# Interactive ipywidgets UI if available (same pattern as above)
+if INTERACTIVE:
+    term_input = widgets.Text(value="vampire", placeholder="Type a word ...", description="Term:", layout=widgets.Layout(width="60%"))
+    normalize_chk = widgets.Checkbox(value=False, description="Normalize (per 1k words)", indent=False)
+    stopwords_chk = widgets.Checkbox(value=False, description="Remove simple stopwords", indent=False)
+    submit_btn = widgets.Button(description="Plot", button_style="primary")
+    out = widgets.Output(layout=widgets.Layout(width="100%"))
+
+    def on_submit(_):
+        with out:
+            clear_output(wait=True)
+            t = term_input.value.strip()
+            if not t:
+                print("Enter a term to visualize.")
+                return
+            counts = counts_for_term(t, plot_df_template)
+            df_plot2 = pd.DataFrame({
+                "chapter": plot_df_template["chapter"].astype(int),
+                "count": counts,
+            }).sort_values("chapter")
+            if normalize_chk.value:
+                df_plot2["norm_per_1k"] = df_plot2["count"] / (plot_df_template["word_count"].replace({0:1}) / 1000).values
+                ycol = "norm_per_1k"
+            else:
+                ycol = "count"
+            fig2 = px.line(df_plot2[df_plot2["chapter"]>0], x="chapter", y=ycol, markers=True,
+                          title=f"Frequency of “{t}” by chapter", labels={"chapter":"Chapter", ycol:"Occurrences"})
+            fig2.update_layout(height=420, xaxis=dict(dtick=1))
+            fig2.show()
+
+    submit_btn.on_click(on_submit)
+    display(HTML("<h4>Search term frequency across chapters (raw)</h4>"))
+    display(widgets.HBox([term_input, submit_btn]))
+    display(widgets.HBox([normalize_chk, stopwords_chk]))
+    display(out)
+
+
+```

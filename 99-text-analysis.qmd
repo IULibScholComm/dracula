@@ -98,7 +98,8 @@ chap_df = load_chapters_from_clean_text(clean_path)
 #| label: compute_or_load_chap_lemmas
 #| echo: false
 #| eval: true
-#| cache: false
+#| cache: true
+#| freeze: auto
 #| warning: false
 #| error: false
 
@@ -354,147 +355,401 @@ else:
 
 ```
 
-```{python}
-#| label: widgets_termfreq
-#| echo: false
-#| eval: true
-#| cache: false
-#| warning: false
-#| error: false
+---
+format: html
+execute:
+  echo: false
+  enabled: true
+---
 
-def counts_for_term(term, df):
-    term = term.strip()
-    if term == "":
-        return [0] * len(df)
-    q = re.escape(term)
-    q = q.replace(r"\ ", r"\s+")
-    pattern = re.compile(rf"\b{q}\b", flags=re.IGNORECASE)
-    counts = []
-    for t in df["text"]:
-        if not isinstance(t, str) or t.strip()=="":
-            counts.append(0)
-        else:
-            counts.append(len(pattern.findall(t)))
-    return counts
+<div style="max-width:900px">
+  <p>Enter a single **lemmatized** word (no multi-word phrases). Example: <code>vampire</code></p>
 
-plot_df_template = chap_df[chap_df["chapter"] >= 0].sort_values("chapter").copy()
-plot_df_template["word_count"] = plot_df_template["text"].str.split().str.len().fillna(0).astype(int)
+  <label for="lemma">Lemma:</label>
+  <input id="lemma" placeholder="vampire" style="width:220px" />
+  <button id="plotBtn">Plot</button>
+  <label style="margin-left:12px"><input type="checkbox" id="normalize" /> Normalize (per 1k words)</label>
 
-# Non-interactive example (Quarto-friendly)
-term = "vampire"
-counts = counts_for_term(term, plot_df_template)
-df_plot = pd.DataFrame({
-    "chapter": plot_df_template["chapter"].astype(int),
-    "count": counts,
-    "marker": plot_df_template.get("marker", plot_df_template["chapter"].astype(str))
-}).sort_values("chapter")
-df_plot = df_plot[df_plot["chapter"] > 0]
-df_plot["norm_per_1k"] = df_plot["count"] / (plot_df_template.loc[df_plot.index, "word_count"].replace({0:1}) / 1000)
+  <!-- status is an ARIA live region -->
+  <div id="status" style="margin-top:8px;color:#666" aria-live="polite" role="status">Status: initializing...</div>
+  <div id="plotArea" style="margin-top:12px"></div>
 
-# Static example: show raw counts line
-import plotly.express as px
-fig = px.line(df_plot, x="chapter", y="count", markers=True, title=f"Frequency of “{term}” by chapter",
-              labels={"chapter":"Chapter","count":"Raw occurrences"})
-fig.update_layout(height=420, xaxis=dict(dtick=1), margin=dict(l=40,r=20,t=60,b=40))
-fig.show()
+  <p style="color:#666; margin-top:14px; font-size:0.95em">
+    This lightweight page parses a precomputed CSV in-browser and produces an accessible plot + numeric table. If you need spaCy or NER, run the original notebook (Binder/Colab).
+  </p>
+</div>
 
-# Interactive ipywidgets UI if available (same pattern as above)
-if INTERACTIVE:
-    term_input = widgets.Text(value="vampire", placeholder="Type a word ...", description="Term:", layout=widgets.Layout(width="60%"))
-    normalize_chk = widgets.Checkbox(value=False, description="Normalize (per 1k words)", indent=False)
-    stopwords_chk = widgets.Checkbox(value=False, description="Remove simple stopwords", indent=False)
-    submit_btn = widgets.Button(description="Plot", button_style="primary")
-    out = widgets.Output(layout=widgets.Layout(width="100%"))
+<script type="module">
+// ---------- Configuration ----------
+const CSV_CANDIDATES = [
+  "https://iulibscholcomm.github.io/dracula/data/chap_lemmas.csv",
+  "/dracula/data/chap_lemmas.csv",
+  "/data/chap_lemmas.csv",
+  "data/chap_lemmas.csv",
+  "chap_lemmas.csv"
+];
 
-    def on_submit(_):
-        with out:
-            clear_output(wait=True)
-            t = term_input.value.strip()
-            if not t:
-                print("Enter a term to visualize.")
-                return
-            counts = counts_for_term(t, plot_df_template)
-            df_plot2 = pd.DataFrame({
-                "chapter": plot_df_template["chapter"].astype(int),
-                "count": counts,
-            }).sort_values("chapter")
-            if normalize_chk.value:
-                df_plot2["norm_per_1k"] = df_plot2["count"] / (plot_df_template["word_count"].replace({0:1}) / 1000).values
-                ycol = "norm_per_1k"
-            else:
-                ycol = "count"
-            fig2 = px.line(df_plot2[df_plot2["chapter"]>0], x="chapter", y=ycol, markers=True,
-                          title=f"Frequency of “{t}” by chapter", labels={"chapter":"Chapter", ycol:"Occurrences"})
-            fig2.update_layout(height=420, xaxis=dict(dtick=1))
-            fig2.show()
+const statusEl = document.getElementById("status");
+const plotEl = document.getElementById("plotArea");
+const plotBtn = document.getElementById("plotBtn");
+const lemmaInput = document.getElementById("lemma");
+const normalizeBox = document.getElementById("normalize");
 
-    submit_btn.on_click(on_submit)
-    display(HTML("<h4>Search term frequency across chapters (raw)</h4>"))
-    display(widgets.HBox([term_input, submit_btn]))
-    display(widgets.HBox([normalize_chk, stopwords_chk]))
-    display(out)
+let cachedChapters = null;
+
+// ---------- Fetch & parse CSV ----------
+async function fetchCsvCandidates(candidates) {
+  for (const url of candidates) {
+    statusEl.textContent = `Status: attempting to fetch ${url} ...`;
+    try {
+      const r = await fetch(url);
+      if (!r.ok) continue;
+      const text = await r.text();
+      statusEl.textContent = `Status: loaded ${url}`;
+      return { url, text };
+    } catch (e) {
+      console.debug("fetch failed", url, e);
+      continue;
+    }
+  }
+  throw new Error("All CSV fetch attempts failed.");
+}
+
+// Minimal CSV parser with quoted-field support
+function parseCSV(text) {
+  const rows = [];
+  let cur = "", inQuotes = false, row = [];
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    const nch = text[i+1];
+    if (ch === '"') {
+      if (inQuotes && nch === '"') { cur += '"'; i++; } // escaped quote
+      else inQuotes = !inQuotes;
+    } else if (ch === ',' && !inQuotes) {
+      row.push(cur); cur = "";
+    } else if ((ch === '\n' || ch === '\r') && !inQuotes) {
+      if (ch === '\r' && nch === '\n') { i++; }
+      row.push(cur);
+      rows.push(row);
+      row = [];
+      cur = "";
+    } else {
+      cur += ch;
+    }
+  }
+  if (cur !== "" || row.length > 0) { row.push(cur); rows.push(row); }
+  return rows;
+}
+
+function csvRowsToObjects(rows) {
+  if (!rows || rows.length === 0) return [];
+  const header = rows[0].map(h => h.trim());
+  const objs = [];
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i].length === 1 && rows[i][0].trim() === "") continue;
+    const obj = {};
+    for (let j = 0; j < header.length; j++) {
+      obj[header[j]] = rows[i][j] !== undefined ? rows[i][j] : "";
+    }
+    objs.push(obj);
+  }
+  return objs;
+}
+
+// ---------- Data prep ----------
+function buildChapterCounters(objs) {
+  return objs.map(o => {
+    const chap = Number(o.chapter) || 0;
+    const lemmas = (o.lemmas_str || "").trim();
+    const word_count = Number(o.word_count) || 0;
+    const tokens = lemmas ? lemmas.split(/\s+/) : [];
+    const freq = {};
+    for (const t of tokens) {
+      const key = t.toLowerCase();
+      freq[key] = (freq[key] || 0) + 1;
+    }
+    return { chapter: chap, freq, word_count };
+  });
+}
+
+function computeCounts(chapters, query, normalizeFlag) {
+  const q = query.trim().toLowerCase();
+  const raw = chapters.map(c => c.freq[q] || 0);
+  const words = chapters.map(c => c.word_count || 0);
+  const norm = normalizeFlag ? raw.map((v,i) => {
+    const wc = words[i] || 1;
+    return (v / wc) * 1000.0;
+  }) : null;
+  return { raw, norm, words };
+}
+
+// ---------- Trend calc ----------
+function computeTrend(series) {
+  const n = series.length;
+  if (n < 2) return { text: "Not enough points to compute trend.", slope: 0, r: 0 };
+  const x = Array.from({length:n}, (_,i)=>i+1);
+  const mean = arr => arr.reduce((a,b)=>a+b,0)/arr.length;
+  const mx = mean(x), my = mean(series);
+  let num = 0, denx = 0, deny = 0;
+  for (let i=0;i<n;i++){
+    num += (x[i]-mx)*(series[i]-my);
+    denx += (x[i]-mx)*(x[i]-mx);
+    deny += (series[i]-my)*(series[i]-my);
+  }
+  const slope = denx === 0 ? 0 : num/denx;
+  const r = (denx*deny === 0) ? 0 : (num / Math.sqrt(denx*deny));
+  let text = "";
+  if (Math.abs(r) >= 0.4) {
+    text = slope > 0 ? `Increasing trend (slope=${slope.toFixed(3)}, r=${r.toFixed(2)}).`
+                     : `Decreasing trend (slope=${slope.toFixed(3)}, r=${r.toFixed(2)}).`;
+  } else if (Math.abs(r) >= 0.2) {
+    text = slope > 0 ? `Mild upward trend (slope=${slope.toFixed(3)}, r=${r.toFixed(2)}).`
+                     : `Mild downward trend (slope=${slope.toFixed(3)}, r=${r.toFixed(2)}).`;
+  } else {
+    text = `No clear trend (slope=${slope.toFixed(3)}, r=${r.toFixed(2)}).`;
+  }
+  return { text, slope, r };
+}
+
+// ---------- SVG plot renderer ----------
+function renderSvgPlot(values, opts={width:900,height:260, stroke:'#1b4f72'}) {
+  const W = opts.width, H = opts.height;
+  const pad = {left:40,right:12,top:18,bottom:36};
+  const n = Math.max(values.length, 1);
+  const maxv = Math.max(...values, 1);
+  const minv = Math.min(...values, 0);
+  const span = (maxv - minv) || 1;
+  const x = i => pad.left + ( (n===1) ? (W - pad.left - pad.right)/2 : (i/(n-1))*(W - pad.left - pad.right) );
+  const y = v => pad.top + (1 - (v - minv)/span)*(H - pad.top - pad.bottom);
+
+  const pts = values.map((v,i)=>`${x(i)},${y(v)}`).join(' ');
+
+  const svg = document.createElementNS("http://www.w3.org/2000/svg","svg");
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.setAttribute("width", "100%");
+  svg.setAttribute("height", H);
+  svg.setAttribute("role","img");
+  svg.style.maxWidth = "100%";
+  svg.style.outline = "none";
+
+  const ny = 4;
+  for (let i=0;i<=ny;i++){
+    const val = minv + (i/ny)*span;
+    const yPos = y(val);
+    const line = document.createElementNS(svg.namespaceURI,'line');
+    line.setAttribute('x1', pad.left);
+    line.setAttribute('x2', W - pad.right);
+    line.setAttribute('y1', yPos);
+    line.setAttribute('y2', yPos);
+    line.setAttribute('stroke', '#eee');
+    line.setAttribute('stroke-width','1');
+    svg.appendChild(line);
+
+    const tx = document.createElementNS(svg.namespaceURI,'text');
+    tx.setAttribute('x', 8);
+    tx.setAttribute('y', yPos - 2);
+    tx.setAttribute('font-size','11');
+    tx.setAttribute('fill','#333');
+    tx.textContent = Number(val).toFixed(0);
+    svg.appendChild(tx);
+  }
+
+  const pl = document.createElementNS(svg.namespaceURI,'polyline');
+  pl.setAttribute('points', pts);
+  pl.setAttribute('fill','none');
+  pl.setAttribute('stroke', opts.stroke || '#000');
+  pl.setAttribute('stroke-width','2');
+  svg.appendChild(pl);
+
+  for (let i=0;i<values.length;i++){
+    const c = document.createElementNS(svg.namespaceURI,'circle');
+    c.setAttribute('cx', x(i));
+    c.setAttribute('cy', y(values[i]));
+    c.setAttribute('r','3');
+    c.setAttribute('fill', opts.stroke || '#000');
+    svg.appendChild(c);
+  }
+
+  for (let i=0;i<values.length;i++){
+    if (values.length > 30 && (i % Math.ceil(values.length/20) !== 0)) continue;
+    const tx = document.createElementNS(svg.namespaceURI,'text');
+    tx.setAttribute('x', x(i));
+    tx.setAttribute('y', H - 8);
+    tx.setAttribute('font-size','10');
+    tx.setAttribute('text-anchor','middle');
+    tx.setAttribute('fill','#333');
+    tx.textContent = (i+1).toString();
+    svg.appendChild(tx);
+  }
+
+  return svg;
+}
+
+// ---------- Accessible report builder ----------
+function buildAccessibleReport(container, query, countsRaw, countsNorm, wordCounts, normalizeFlag, trendText) {
+  container.innerHTML = "";
+
+  const trendP = document.createElement("p");
+  trendP.style.fontStyle = "italic";
+  trendP.textContent = trendText || "";
+  container.appendChild(trendP);
+
+  const total = countsRaw.reduce((a,b)=>a+b,0);
+  const maxv = Math.max(...countsRaw);
+  const maxCh = countsRaw.map((v,i)=>v===maxv?(i+1):null).filter(Boolean).join(", ") || "N/A";
+  const minv = Math.min(...countsRaw);
+  const minCh = countsRaw.map((v,i)=>v===minv?(i+1):null).filter(Boolean).join(", ") || "N/A";
+  const summaryP = document.createElement("p");
+  summaryP.textContent = `${countsRaw.length} chapters. Total occurrences (raw): ${total}. Highest raw count: ${maxv} (chapter(s) ${maxCh}). Lowest raw count: ${minv} (chapter(s) ${minCh}).`;
+  container.appendChild(summaryP);
+
+  const csvLines = ["chapter,word_count,raw_count" + (countsNorm ? ",normalized_per_1k" : "")];
+  for (let i=0;i<countsRaw.length;i++){
+    const chap = i+1;
+    const wc = wordCounts[i] || "";
+    const raw = countsRaw[i] || 0;
+    const norm = countsNorm ? countsNorm[i] : "";
+    csvLines.push([chap, wc, raw, norm].filter((_,idx)=> idx<3 || countsNorm).join(","));
+  }
+  const csvBlob = new Blob([csvLines.join("\n")], {type: "text/csv"});
+  const url = URL.createObjectURL(csvBlob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `dracula_${query}_chapter_counts.csv`;
+  a.textContent = "Download chapter counts (CSV)";
+  a.style.display = "inline-block";
+  a.style.margin = "6px 0";
+  container.appendChild(a);
+
+  const table = document.createElement("table");
+  table.style.width = "100%";
+  table.style.borderCollapse = "collapse";
+  table.style.marginTop = "8px";
+  table.setAttribute("role","table");
+
+  const caption = document.createElement("caption");
+  caption.textContent = `Chapter counts for lemma "${query}"`;
+  caption.style.textAlign = "left";
+  caption.style.fontWeight = "600";
+  table.appendChild(caption);
+
+  const thead = document.createElement("thead");
+  const thr = document.createElement("tr");
+  ["Chapter","Word count","Raw occurrences", normalizeFlag ? "Normalized per 1k words" : null].forEach(h=>{
+    if (!h) return;
+    const th = document.createElement("th");
+    th.scope = "col";
+    th.textContent = h;
+    th.style.borderBottom = "1px solid #ccc";
+    th.style.padding = "6px 4px";
+    thr.appendChild(th);
+  });
+  thead.appendChild(thr);
+  table.appendChild(thead);
+
+  const tbody = document.createElement("tbody");
+  for (let i=0;i<countsRaw.length;i++){
+    const tr = document.createElement("tr");
+    const th = document.createElement("th");
+    th.scope = "row";
+    th.textContent = (i+1).toString();
+    th.style.padding = "6px 4px";
+    tr.appendChild(th);
+
+    const tdW = document.createElement("td");
+    tdW.textContent = wordCounts[i] || "";
+    tdW.style.padding = "6px 4px";
+    tr.appendChild(tdW);
+
+    const tdR = document.createElement("td");
+    tdR.textContent = countsRaw[i] || 0;
+    tdR.style.padding = "6px 4px";
+    tr.appendChild(tdR);
+
+    if (normalizeFlag) {
+      const tdN = document.createElement("td");
+      tdN.textContent = (countsNorm && countsNorm[i]!==undefined && countsNorm[i]!==null) ? Number(countsNorm[i]).toFixed(2) : "";
+      tdN.style.padding = "6px 4px";
+      tr.appendChild(tdN);
+    }
+
+    tbody.appendChild(tr);
+  }
+  table.appendChild(tbody);
+  container.appendChild(table);
+}
+
+// ---------- Main UI flow ----------
+async function initializeData() {
+  try {
+    const res = await fetchCsvCandidates(CSV_CANDIDATES);
+    const rows = parseCSV(res.text);
+    const objs = csvRowsToObjects(rows);
+
+    if (objs.length === 0 || !('lemmas_str' in objs[0])) {
+      statusEl.textContent = "Status: CSV missing expected columns (chapter, lemmas_str, word_count).";
+      throw new Error("CSV parse/format issue");
+    }
+
+    cachedChapters = buildChapterCounters(objs);
+    statusEl.textContent = `Status: ready (using ${res.url}). Enter a lemmatized word and click Plot.`;
+  } catch (e) {
+    console.error("Data init error:", e);
+    statusEl.textContent = "Status: failed to load or parse chap_lemmas.csv. Check console.";
+  }
+}
+
+async function plotLemma(query, normalizeFlag) {
+  if (!cachedChapters) {
+    statusEl.textContent = "Status: data not initialized.";
+    return;
+  }
+  if (!query || !query.trim()) { alert("Enter a lemmatized single word (e.g., 'vampire')."); return; }
+
+  statusEl.textContent = "Status: computing counts & plotting...";
+  try {
+    const { raw, norm, words } = computeCounts(cachedChapters, query, normalizeFlag);
+    const seriesForTrend = normalizeFlag ? norm : raw;
+    const trend = computeTrend(seriesForTrend.map(v => Number(v || 0)));
+
+    plotEl.innerHTML = "";
+    const heading = document.createElement("div");
+    heading.textContent = `Frequency of '${query}' (lemmatized) — n_chapters=${raw.length}`;
+    heading.style.fontWeight = "600";
+    heading.style.marginBottom = "6px";
+    plotEl.appendChild(heading);
+
+    const svgValues = (normalizeFlag && norm) ? norm : raw;
+    const svg = renderSvgPlot(svgValues, {width:900,height:260, stroke:'#1b4f72'});
+    svg.setAttribute("tabindex", "0");
+    const desc = document.createElement("div");
+    desc.style.marginTop = "8px";
+    desc.setAttribute("role","region");
+    desc.setAttribute("aria-live","polite");
+    desc.setAttribute("id", "desc-" + Math.random().toString(36).slice(2,8));
+    svg.setAttribute("aria-describedby", desc.id);
+    plotEl.appendChild(svg);
+    plotEl.appendChild(desc);
+
+    buildAccessibleReport(desc, query, raw, norm, words, normalizeFlag, trend.text);
+
+    statusEl.textContent = "Status: done.";
+  } catch (err) {
+    console.error("Plot error:", err);
+    statusEl.textContent = "Status: error during plotting — see console.";
+    plotEl.innerHTML = `<pre style="color:red">Error: ${String(err)}</pre>`;
+  }
+}
+
+// UI wiring
+plotBtn.addEventListener("click", () => plotLemma(lemmaInput.value.trim(), normalizeBox.checked));
+lemmaInput.addEventListener("keydown", (e) => { if (e.key === "Enter") plotBtn.click(); });
+
+// init
+initializeData();
+</script>
 
 
-```
-
-```{python}
-#| label: sentiment_vader
-#| echo: false
-#| eval: true
-#| cache: true
-#| freeze: auto
-#| warning: false
-#| error: false
-
-# ensure VADER resource available; try to download quietly if missing
-try:
-    nltk.data.find("sentiment/vader_lexicon.zip")
-except LookupError:
-    logging.info("Downloading VADER lexicon (nltk).")
-    nltk.download("vader_lexicon", quiet=True)
-
-from nltk.sentiment.vader import SentimentIntensityAnalyzer
-sid = SentimentIntensityAnalyzer()
-
-# compute raw VADER compound score per chapter (works for full chapter text)
-chap_df = chap_df.copy()
-chap_df['vader_compound'] = chap_df['text'].apply(lambda t: sid.polarity_scores(t)['compound'] if isinstance(t, str) else 0.0)
-
-# compute word counts and guard against zero
-chap_df['word_count'] = chap_df['text'].str.split().str.len().fillna(0).astype(int)
-wc = chap_df['word_count'].replace({0: 1})   # safe divisor
-chap_df['sentiment_per_1k_words'] = chap_df['vader_compound'] / (wc / 1000.0)
-
-# persist for later use or external analysis
-( DATA_DIR / "sentiment_by_chapter.csv" ).write_text(chap_df[['chapter','marker','word_count','vader_compound','sentiment_per_1k_words']].to_csv(index=False, encoding="utf-8"), encoding="utf-8")
-logging.info("Wrote data/sentiment_by_chapter.csv")
-```
-```{python}
-#| label: sentiment_line_plot_normalized
-#| echo: false
-#| eval: true
-#| cache: true
-#| freeze: auto
-#| warning: false
-#| error: false
-
-import plotly.express as px
-
-plot_df = chap_df[chap_df["chapter"] > 0].sort_values("chapter").copy()
-if plot_df.empty:
-    print("No chapter data available to plot.")
-else:
-    plot_df["chapter"] = pd.to_numeric(plot_df["chapter"], errors="coerce")
-
-    fig = px.line(plot_df, x="chapter", y="sentiment_per_1k_words", markers=True,
-                  title="Length-normalized sentiment trajectory across Dracula",
-                  labels={"chapter":"Chapter", "sentiment_per_1k_words":"Sentiment per 1,000 words (VADER)"},
-                  hover_data={"marker":True, "sentiment_per_1k_words":":.3f"})
-    fig.add_hline(y=0, line_dash="dash", line_color="gray", annotation_text="Neutral (0)", annotation_position="bottom right")
-    fig.update_layout(margin=dict(l=60, r=20, t=60, b=60), height=420, xaxis=dict(dtick=1, tickmode="linear"), template="plotly_white")
-    fig.show()
-
-```
 
 
 ```{python}
@@ -631,12 +886,13 @@ else:
 ```
 ```{python}
 #| label: plotly_bubble_map
-#| echo: false
+#| echo: true
 #| eval: true
 #| cache: true
 #| freeze: auto
 #| warning: false
 #| error: false
+#| code-fold: true
 
 DATA_CSV = DATA_DIR / "places_per_chapter.csv"
 if not DATA_CSV.exists():
@@ -688,6 +944,67 @@ else:
     except Exception:
         pass
 
+    fig.show()
+
+```
+
+
+```{python}
+#| label: sentiment_vader
+#| echo: false
+#| eval: true
+#| cache: true
+#| freeze: auto
+#| warning: false
+#| error: false
+
+# ensure VADER resource available; try to download quietly if missing
+try:
+    nltk.data.find("sentiment/vader_lexicon.zip")
+except LookupError:
+    logging.info("Downloading VADER lexicon (nltk).")
+    nltk.download("vader_lexicon", quiet=True)
+
+from nltk.sentiment.vader import SentimentIntensityAnalyzer
+sid = SentimentIntensityAnalyzer()
+
+# compute raw VADER compound score per chapter (works for full chapter text)
+chap_df = chap_df.copy()
+chap_df['vader_compound'] = chap_df['text'].apply(lambda t: sid.polarity_scores(t)['compound'] if isinstance(t, str) else 0.0)
+
+# compute word counts and guard against zero
+chap_df['word_count'] = chap_df['text'].str.split().str.len().fillna(0).astype(int)
+wc = chap_df['word_count'].replace({0: 1})   # safe divisor
+chap_df['sentiment_per_1k_words'] = chap_df['vader_compound'] / (wc / 1000.0)
+
+# persist for later use or external analysis
+( DATA_DIR / "sentiment_by_chapter.csv" ).write_text(chap_df[['chapter','marker','word_count','vader_compound','sentiment_per_1k_words']].to_csv(index=False, encoding="utf-8"), encoding="utf-8")
+logging.info("Wrote data/sentiment_by_chapter.csv")
+```
+```{python}
+#| label: sentiment_line_plot_normalized
+#| echo: true
+#| eval: true
+#| cache: true
+#| freeze: auto
+#| warning: false
+#| error: false
+#| code-fold: true
+
+import plotly.express as px
+
+plot_df = chap_df[chap_df["chapter"] > 0].sort_values("chapter").copy()
+if plot_df.empty:
+    print("No chapter data available to plot.")
+else:
+    plot_df["chapter"] = pd.to_numeric(plot_df["chapter"], errors="coerce")
+
+    fig = px.line(plot_df, x="chapter", y="sentiment_per_1k_words", markers=True,
+                  title="Length-normalized sentiment trajectory across Dracula",
+                  labels={"chapter":"Chapter", "sentiment_per_1k_words":"Sentiment per 1,000 words (VADER)"},
+                  hover_data={"marker":True, "sentiment_per_1k_words":":.3f"})
+    fig.add_hline(y=0, line_dash="dash", line_color="gray", annotation_text="Neutral (0)", annotation_position="bottom right")
+    fig.update_layout(margin=dict(l=60, r=20, t=60, b=60), height=420, xaxis=dict(dtick=1, tickmode="linear"), template="plotly_white")
     fig.show()
 
 ```
