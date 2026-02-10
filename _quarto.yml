@@ -81,7 +81,7 @@ format:
     code-line-numbers: true
     code-copy: true
     code-block-border-left: true
-    cache: true
+    cache: false
     eval: true
     echo: false
     output: true
