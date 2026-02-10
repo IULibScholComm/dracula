@@ -234,8 +234,15 @@ If you want full spaCy-powered searches or NER, run the original notebook in Bin
    - on query, computes counts per chapter and returns a base64 PNG (matplotlib).
 */
 
-// Try these candidate locations (user-specified first)
-const CSV_CANDIDATES = ["chap_lemmas.csv"];
+// replace current CSV_CANDIDATES line with this
+const CSV_CANDIDATES = [
+  "https://iulibscholcomm.github.io/dracula/data/chap_lemmas.csv",
+  "/dracula/data/chap_lemmas.csv",
+  "/data/chap_lemmas.csv",
+  "data/chap_lemmas.csv",
+  "chap_lemmas.csv"
+];
+
 
 const statusEl = document.getElementById("status");
 const plotEl = document.getElementById("plotArea");
@@ -290,18 +297,48 @@ async function tryFetchCandidates(candidates) {
 
 // Python template: load CSV from injected 'csv_text', build per-chapter counters, return a Python object handle
 const initPyCode = `
-import io, pandas as pd, re
+import io, pandas as pd, re, sys
 from collections import Counter
-csv_text = csv_text  # injected
-df = pd.read_csv(io.StringIO(csv_text), encoding='utf-8')
-# Ensure expected columns
-for col in ['chapter','lemmas_str','word_count']:
-    if col not in df.columns:
-        raise ValueError("chap_lemmas.csv must contain column: " + col)
-# normalize types
+
+# Defensive checks on injected csv_text
+if 'csv_text' not in globals():
+    raise ValueError("Injected variable 'csv_text' not present in Python globals.")
+
+if csv_text is None:
+    raise ValueError("Injected csv_text is None. The JS fetch likely failed or returned no body.")
+
+if not isinstance(csv_text, str):
+    raise ValueError("Injected csv_text is not a string (type: {}).".format(type(csv_text)))
+
+if csv_text.strip() == "":
+    # show a short preview so user can see whether they got an HTML 404 page, etc.
+    preview = (csv_text or "")[:1000]
+    raise ValueError("CSV content appears empty. Preview (first 1000 chars):\\n" + preview)
+
+# Try to read with pandas; catch common parsing errors and surface a helpful message.
+try:
+    df = pd.read_csv(io.StringIO(csv_text), encoding='utf-8')
+except Exception as e:
+    # include a short preview so we can see if it's an HTML 404 or garbled text
+    preview = (csv_text or "")[:1000]
+    raise ValueError("pd.read_csv failed: {}\\nPreview (first 1000 chars):\\n{}".format(e, preview))
+
+if df is None:
+    raise ValueError("pd.read_csv returned None (unexpected).")
+
+# Ensure expected columns exist and report precisely which are missing
+expected_cols = ['chapter', 'lemmas_str', 'word_count']
+found_cols = [str(c) for c in df.columns.tolist()]
+missing = [c for c in expected_cols if c not in found_cols]
+if missing:
+    raise ValueError("chap_lemmas.csv is missing required columns: {}. Found columns: {}. (Header row preview: {})"
+                     .format(", ".join(missing), ", ".join(found_cols), ",".join(found_cols[:10])))
+
+# normalize types and fill defaults
 df['chapter'] = pd.to_numeric(df['chapter'], errors='coerce').fillna(0).astype(int)
-df['lemmas_str'] = df['lemmas_str'].fillna("").astype(str)
-df['word_count'] = pd.to_numeric(df['word_count'], errors='coerce').fillna(0).astype(int)
+df['lemmas_str'] = df.get('lemmas_str', '').fillna("").astype(str)
+df['word_count'] = pd.to_numeric(df.get('word_count', 0), errors='coerce').fillna(0).astype(int)
+
 # Build per-chapter counters
 chapter_counters = []
 for s in df['lemmas_str'].tolist():
@@ -309,9 +346,11 @@ for s in df['lemmas_str'].tolist():
         chapter_counters.append(Counter())
     else:
         chapter_counters.append(Counter(s.split()))
+
 # return tuple: df (for metadata) and counters
 (df, chapter_counters)
 `;
+
 
 const plotPyTemplate = `
 import io, base64, matplotlib
