@@ -41,7 +41,7 @@ This page will attempt to fetch `/data/chap_lemmas.csv` first (as you specified)
 */
 
 // Try these candidate locations (user-specified first)
-const CSV_CANDIDATES = ["/data/chap_lemmas.csv", "data/chap_lemmas.csv", "_resources/chap_lemmas.csv", "chap_lemmas.csv"];
+const CSV_CANDIDATES = ["chap_lemmas.csv"];
 
 const statusEl = document.getElementById("status");
 const plotEl = document.getElementById("plotArea");
