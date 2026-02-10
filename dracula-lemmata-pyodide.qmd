@@ -5,16 +5,6 @@ execute:
   echo: false
   enabled: true
 ---
-
-This page runs entirely in the browser (Pyodide). It expects a `chap_lemmas.csv` with the columns:
-
-- `chapter` (int)
-- `marker` (text; optional)
-- `lemmas_str` (space-separated lemmatized tokens, e.g., `"vampire count dracula ..."`)
-- `word_count` (int; words in the chapter)
-
-This page will attempt to fetch `/data/chap_lemmas.csv` first (as you specified). If that path fails it will try a couple common alternatives.
-
 <div style="max-width:900px">
   <p>Enter a single **lemmatized** word (no multi-word phrases). Example: <code>vampire</code></p>
 
@@ -32,15 +22,12 @@ This page will attempt to fetch `/data/chap_lemmas.csv` first (as you specified)
 </div>
 
 <script type="module">
-/* Pyodide client that:
-   - loads pyodide + micropip,
-   - installs pandas & matplotlib,
-   - fetches chap_lemmas.csv as text,
-   - initializes per-chapter Counters from the 'lemmas_str' column,
-   - on query, computes counts per chapter and returns a base64 PNG (matplotlib).
+/* Single unified Pyodide-powered script.
+   - Replaces duplicate functions / states in your prior version.
+   - Keeps pyState as an object { df_proxy, counters_proxy, source }.
 */
 
-// replace current CSV_CANDIDATES line with this
+// Candidate CSV paths (replace/extend as you like)
 const CSV_CANDIDATES = [
   "https://iulibscholcomm.github.io/dracula/data/chap_lemmas.csv",
   "/dracula/data/chap_lemmas.csv",
@@ -48,7 +35,6 @@ const CSV_CANDIDATES = [
   "data/chap_lemmas.csv",
   "chap_lemmas.csv"
 ];
-
 
 const statusEl = document.getElementById("status");
 const plotEl = document.getElementById("plotArea");
@@ -59,7 +45,91 @@ const normalizeBox = document.getElementById("normalize");
 let pyodide = null;
 let pyReady = false;
 let csvTextCache = null;
+let pyState = null; // { df_proxy, counters_proxy, source }
 
+// Python snippets used later
+const initPyGlobals = `
+import io, pandas as pd
+from collections import Counter
+
+# csv_text is injected by JS
+if 'csv_text' not in globals() or csv_text is None:
+    raise ValueError("csv_text not provided or is None.")
+
+# Read CSV robustly
+try:
+    df = pd.read_csv(io.StringIO(csv_text), encoding='utf-8')
+except Exception as e:
+    preview = (csv_text or "")[:1000]
+    raise ValueError(f"pd.read_csv failed: {e}\\nPreview (first 1000 chars):\\n{preview}")
+
+# Validate minimal columns
+required = ['chapter','lemmas_str','word_count']
+missing = [c for c in required if c not in df.columns]
+if missing:
+    raise ValueError("Missing columns in chap_lemmas.csv: " + ",".join(missing))
+
+# Normalize types and fillna
+df['chapter'] = pd.to_numeric(df['chapter'], errors='coerce').fillna(0).astype(int)
+df['lemmas_str'] = df.get('lemmas_str', '').fillna("").astype(str)
+df['word_count'] = pd.to_numeric(df.get('word_count', 0), errors='coerce').fillna(0).astype(int)
+
+# Build counters per row
+chapter_counters = []
+for s in df['lemmas_str'].tolist():
+    if not s:
+        chapter_counters.append(Counter())
+    else:
+        chapter_counters.append(Counter(s.split()))
+
+# Expose to JS via pyodide.globals
+chap_df = df
+chapter_counters = chapter_counters
+
+# readiness
+"OK"
+`;
+
+const plotPyTemplate = `
+import io, base64, matplotlib
+matplotlib.use("agg")
+import matplotlib.pyplot as plt
+import numpy as np
+
+# injected by JS: df, counters, query, normalize_flag
+q = query.strip().lower()
+if not q:
+    raise ValueError("Empty query")
+
+# counters is expected to be an iterable of Counter objects
+try:
+    counts = [c.get(q, 0) for c in counters]
+except Exception as e:
+    raise ValueError("Error iterating counters: " + str(e))
+
+lengths = df['word_count'].tolist()
+arr = np.array(counts, dtype=float)
+if normalize_flag:
+    lens = np.array(lengths, dtype=float)
+    lens[lens==0] = 1.0
+    arr = arr / lens * 1000.0
+
+x = np.arange(1, len(arr)+1)
+fig, ax = plt.subplots(figsize=(9,3))
+ax.plot(x, arr, marker='o', linewidth=1)
+ax.set_xlabel("Chapter")
+ax.set_ylabel("Occurrences per 1k words" if normalize_flag else "Raw count")
+ax.set_title(f"Frequency of '{query}' (lemmatized) — n_chapters={len(arr)}")
+ax.grid(axis='y', alpha=0.3)
+plt.tight_layout()
+buf = io.BytesIO()
+fig.savefig(buf, format='png', dpi=150)
+plt.close(fig)
+buf.seek(0)
+base64.b64encode(buf.getvalue()).decode('ascii')
+`;
+
+// ---------- Helpers ----------
 async function loadPy() {
   statusEl.textContent = "Status: loading Pyodide (may take a few seconds)...";
   if (typeof loadPyodide !== "function") {
@@ -75,7 +145,7 @@ async function loadPy() {
   // install pandas & matplotlib (pyodide wheels)
   await micropip.install("pandas");
   await micropip.install("matplotlib");
-  // ensure numpy
+  // ensure numpy is available as well
   await pyodide.loadPackage(["numpy"]);
   statusEl.textContent = "Status: Python environment ready.";
   pyReady = true;
@@ -101,142 +171,87 @@ async function tryFetchCandidates(candidates) {
   throw new Error("All CSV fetch attempts failed.");
 }
 
-// Python template: load CSV from injected 'csv_text', build per-chapter counters, return a Python object handle
-const initPyCode = `
-import io, pandas as pd, re, sys
-from collections import Counter
-
-# Defensive checks on injected csv_text
-if 'csv_text' not in globals():
-    raise ValueError("Injected variable 'csv_text' not present in Python globals.")
-
-if csv_text is None:
-    raise ValueError("Injected csv_text is None. The JS fetch likely failed or returned no body.")
-
-if not isinstance(csv_text, str):
-    raise ValueError("Injected csv_text is not a string (type: {}).".format(type(csv_text)))
-
-if csv_text.strip() == "":
-    # show a short preview so user can see whether they got an HTML 404 page, etc.
-    preview = (csv_text or "")[:1000]
-    raise ValueError("CSV content appears empty. Preview (first 1000 chars):\\n" + preview)
-
-# Try to read with pandas; catch common parsing errors and surface a helpful message.
-try:
-    df = pd.read_csv(io.StringIO(csv_text), encoding='utf-8')
-except Exception as e:
-    # include a short preview so we can see if it's an HTML 404 or garbled text
-    preview = (csv_text or "")[:1000]
-    raise ValueError("pd.read_csv failed: {}\\nPreview (first 1000 chars):\\n{}".format(e, preview))
-
-if df is None:
-    raise ValueError("pd.read_csv returned None (unexpected).")
-
-# Ensure expected columns exist and report precisely which are missing
-expected_cols = ['chapter', 'lemmas_str', 'word_count']
-found_cols = [str(c) for c in df.columns.tolist()]
-missing = [c for c in expected_cols if c not in found_cols]
-if missing:
-    raise ValueError("chap_lemmas.csv is missing required columns: {}. Found columns: {}. (Header row preview: {})"
-                     .format(", ".join(missing), ", ".join(found_cols), ",".join(found_cols[:10])))
-
-# normalize types and fill defaults
-df['chapter'] = pd.to_numeric(df['chapter'], errors='coerce').fillna(0).astype(int)
-df['lemmas_str'] = df.get('lemmas_str', '').fillna("").astype(str)
-df['word_count'] = pd.to_numeric(df.get('word_count', 0), errors='coerce').fillna(0).astype(int)
-
-# Build per-chapter counters
-chapter_counters = []
-for s in df['lemmas_str'].tolist():
-    if not s:
-        chapter_counters.append(Counter())
-    else:
-        chapter_counters.append(Counter(s.split()))
-
-# return tuple: df (for metadata) and counters
-(df, chapter_counters)
-`;
-
-
-const plotPyTemplate = `
-import io, base64, matplotlib
-matplotlib.use("agg")
-import matplotlib.pyplot as plt
-import numpy as np
-# injected: df, counters, query, normalize_flag
-q = query.strip().lower()
-if not q:
-    raise ValueError("Empty query")
-# count per chapter using counters (list of Counter)
-counts = [c.get(q, 0) for c in counters]
-lengths = df['word_count'].tolist()
-arr = np.array(counts, dtype=float)
-if normalize_flag:
-    lens = np.array(lengths, dtype=float)
-    lens[lens==0] = 1.0
-    arr = arr / lens * 1000.0
-x = np.arange(1, len(arr)+1)
-fig, ax = plt.subplots(figsize=(9,3))
-ax.plot(x, arr, marker='o', linewidth=1)
-ax.set_xlabel("Chapter")
-ax.set_ylabel("Occurrences per 1k words" if normalize_flag else "Raw count")
-ax.set_title(f"Frequency of '{query}' (lemmatized) — n_chapters={len(arr)}")
-ax.grid(axis='y', alpha=0.3)
-plt.tight_layout()
-buf = io.BytesIO()
-fig.savefig(buf, format='png', dpi=150)
-plt.close(fig)
-buf.seek(0)
-base64.b64encode(buf.getvalue()).decode('ascii')
-`;
-
-let pyState = null; // will hold tuple (df, counters) as PyProxy
-
+// ---------- Initialization sequence ----------
 (async () => {
   try {
     await loadPy();
-    // fetch CSV from the candidate list (user-specified /data path first)
-    let csvResult = null;
-    try {
-      csvResult = await tryFetchCandidates(CSV_CANDIDATES);
-    } catch (fetchErr) {
-      console.error(fetchErr);
-      statusEl.textContent = "Status: failed to fetch chap_lemmas.csv. Place the file at /data/chap_lemmas.csv or update CSV_CANDIDATES.";
+  } catch (err) {
+    console.error("Pyodide load failed:", err);
+    statusEl.textContent = "Status: Pyodide load failed: " + String(err);
+    return;
+  }
+
+  // fetch CSV text
+  let csvResult = null;
+  try {
+    csvResult = await tryFetchCandidates(CSV_CANDIDATES);
+  } catch (fetchErr) {
+    console.error("CSV fetch attempts failed:", fetchErr);
+    statusEl.textContent = "Status: failed to fetch chap_lemmas.csv. Place file under docs/data and/or update CSV_CANDIDATES.";
+    return;
+  }
+
+  csvTextCache = csvResult.text || "";
+  statusEl.textContent = `Status: building Python state from ${csvResult.url}...`;
+
+  try {
+    // inject csv_text into Python globals and run initialization
+    pyodide.globals.set("csv_text", csvTextCache);
+    const ok = await pyodide.runPythonAsync(initPyGlobals);
+    // remove csv_text to free memory
+    try { pyodide.globals.delete("csv_text"); } catch (e) {}
+    if (ok !== "OK") {
+      console.warn("Python init returned:", ok);
+    }
+
+    // extract proxies
+    const py_df = pyodide.globals.get("chap_df");
+    const py_counters = pyodide.globals.get("chapter_counters");
+
+    if (!py_df || !py_counters) {
+      console.error("Missing Python globals after init:", { py_df, py_counters });
+      statusEl.textContent = "Status: Python init failed — chap_df or chapter_counters not set. See console.";
       return;
     }
-    csvTextCache = csvResult.text;
-    statusEl.textContent = `Status: building lemma counters from ${csvResult.url} (Python)...`;
-    pyodide.globals.set("csv_text", csvTextCache);
-    const res = await pyodide.runPythonAsync(initPyCode);
-    pyState = res;
-    // cleanup large global
-    pyodide.globals.delete("csv_text");
+
+    pyState = { df_proxy: py_df, counters_proxy: py_counters, source: csvResult.url };
     statusEl.textContent = `Status: ready (using ${csvResult.url}). Enter a lemmatized word and click Plot.`;
-  } catch (err) {
-    console.error(err);
-    statusEl.textContent = "Status: initialization error: " + String(err);
+  } catch (pyErr) {
+    console.error("Python initialization error:", pyErr);
+    try { console.warn("CSV preview (first 800 chars):", (csvTextCache||"").slice(0,800)); } catch(e){}
+    statusEl.textContent = "Status: Python initialization failed — see console for details.";
+    return;
   }
 })();
 
-// perform plotting call
+// ---------- Single canonical plotting function ----------
 async function plotLemma(query, normalize) {
-  if (!pyReady || pyState === null) {
-    statusEl.textContent = "Status: Python state not ready.";
+  if (!pyReady) {
+    statusEl.textContent = "Status: Pyodide not ready.";
     return;
   }
+  if (!pyState || !pyState.df_proxy || !pyState.counters_proxy) {
+    statusEl.textContent = "Status: Python state not initialized. Try reloading the page.";
+    console.error("plotLemma called but pyState is missing or malformed:", pyState);
+    return;
+  }
+
   statusEl.textContent = "Status: computing counts & plotting...";
   try {
-    // put handles into globals
-    pyodide.globals.set("df", pyState[0]);         // PyProxy to DataFrame
-    pyodide.globals.set("counters", pyState[1]);   // PyProxy to list of Counter
+    // inject handles expected by plot template
+    pyodide.globals.set("df", pyState.df_proxy);
+    pyodide.globals.set("counters", pyState.counters_proxy);
     pyodide.globals.set("query", query);
     pyodide.globals.set("normalize_flag", normalize);
+
     const b64 = await pyodide.runPythonAsync(plotPyTemplate);
-    // cleanup
-    pyodide.globals.delete("df");
-    pyodide.globals.delete("counters");
-    pyodide.globals.delete("query");
-    pyodide.globals.delete("normalize_flag");
+
+    // cleanup injected globals to avoid accidental reuse / memory growth
+    try { pyodide.globals.delete("df"); } catch(e){}
+    try { pyodide.globals.delete("counters"); } catch(e){}
+    try { pyodide.globals.delete("query"); } catch(e){}
+    try { pyodide.globals.delete("normalize_flag"); } catch(e){}
+
     // render image
     plotEl.innerHTML = "";
     const img = document.createElement("img");
@@ -245,14 +260,16 @@ async function plotLemma(query, normalize) {
     img.style.maxWidth = "100%";
     plotEl.appendChild(img);
     statusEl.textContent = "Status: done.";
-  } catch (e) {
-    console.error(e);
-    statusEl.textContent = "Status: error: " + String(e);
-    plotEl.innerHTML = "<pre style='color:red'>Error: " + String(e) + "</pre>";
+  } catch (err) {
+    console.error("Error during plot:", err);
+    // provide concise user-facing message, details in console
+    let msg = String(err);
+    statusEl.textContent = "Status: error during plotting — see console. " + (msg.split("\\n")[0] || "");
+    plotEl.innerHTML = "<pre style='color:red'>Error: " + (msg.split('\\n')[0] || msg) + "</pre>";
   }
 }
 
-// UI wiring
+// ---------- UI wiring (single copy) ----------
 plotBtn.addEventListener("click", () => {
   const q = lemmaInput.value.trim();
   if (!q) { alert("Enter a lemmatized single word (e.g., 'vampire')."); return; }

@@ -64,7 +64,7 @@
     "href": "dracula-lemmata-pyodide.html",
     "title": "5  Dracula — Lemmatized Term-Frequency (Pyodide + precomputed chap_lemmas.csv)",
     "section": "",
-    "text": "This page runs entirely in the browser (Pyodide). It expects a chap_lemmas.csv with the columns:\n\nchapter (int)\nmarker (text; optional)\nlemmas_str (space-separated lemmatized tokens, e.g., \"vampire count dracula ...\")\nword_count (int; words in the chapter)\n\nThis page will attempt to fetch /data/chap_lemmas.csv first (as you specified). If that path fails it will try a couple common alternatives.\n\n\nEnter a single lemmatized word (no multi-word phrases). Example: vampire\n\nLemma:  Plot  Normalize (per 1k words)\n\nStatus: initializing…\n\n\n\n\n\nIf you want full spaCy-powered searches or NER, run the original notebook in Binder/Colab; this page is designed for lightweight in-browser lemmatized lookups using a precomputed CSV.",
+    "text": "Enter a single lemmatized word (no multi-word phrases). Example: vampire\n\nLemma:  Plot  Normalize (per 1k words)\n\nStatus: initializing…\n\n\n\n\n\nIf you want full spaCy-powered searches or NER, run the original notebook in Binder/Colab; this page is designed for lightweight in-browser lemmatized lookups using a precomputed CSV.",
     "crumbs": [
       "<span class='chapter-number'>5</span>  <span class='chapter-title'>Dracula — Lemmatized Term-Frequency (Pyodide + precomputed chap_lemmas.csv)</span>"
     ]
