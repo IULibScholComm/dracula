@@ -6,11 +6,9 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="author" content="Bram Stoker">
-<meta name="dcterms.date" content="2026-01-01">
 <meta name="description" content="An edition of Bram Stoker’s Dracula that presents the original text alongside computational analyses and visualizations of it.">
 
-<title>Dracula</title>
+<title>5&nbsp; Dracula — Lemmatized Term-Frequency (Pyodide + precomputed chap_lemmas.csv) – Dracula</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -35,7 +33,7 @@ ul.task-list li input[type="checkbox"] {
 <script src="site_libs/quarto-search/fuse.min.js"></script>
 <script src="site_libs/quarto-search/quarto-search.js"></script>
 <meta name="quarto:offset" content="./">
-<link href="./note.html" rel="next">
+<link href="./99-text-analysis.html" rel="prev">
 <link href="./Dracula_cover.jpg" rel="icon" type="image/jpeg">
 <script src="site_libs/quarto-html/quarto.js" type="module"></script>
 <script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
@@ -79,12 +77,12 @@ ul.task-list li input[type="checkbox"] {
 <style>html{ scroll-behavior: smooth; }</style>
 
 
-<meta property="og:title" content="Dracula">
+<meta property="og:title" content="5&nbsp; Dracula — Lemmatized Term-Frequency (Pyodide + precomputed chap_lemmas.csv) – Dracula">
 <meta property="og:description" content="An edition of Bram Stoker’s Dracula that presents the original text alongside computational analyses and visualizations of it.">
 <meta property="og:image" content="https://iulibscholcomm.github.io/dracula/Dracula_cover.jpg">
 <meta property="og:site_name" content="Dracula">
 <meta property="og:image:alt" content="book cover of Dracula with a yellow background and red title, author, and border">
-<meta name="twitter:title" content="Dracula">
+<meta name="twitter:title" content="5&nbsp; Dracula — Lemmatized Term-Frequency (Pyodide + precomputed chap_lemmas.csv) – Dracula">
 <meta name="twitter:description" content="An edition of Bram Stoker’s Dracula that presents the original text alongside computational analyses and visualizations of it.">
 <meta name="twitter:image" content="https://iulibscholcomm.github.io/dracula/Dracula_cover.jpg">
 <meta name="twitter:image:alt" content="book cover of Dracula with a yellow background and red title, author, and border">
@@ -100,7 +98,7 @@ ul.task-list li input[type="checkbox"] {
       <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
         <i class="bi bi-layout-text-sidebar-reverse"></i>
       </button>
-        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="./index.html">Preface</a></li></ol></nav>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="./dracula-lemmata-pyodide.html"><span class="chapter-number">5</span>&nbsp; <span class="chapter-title">Dracula — Lemmatized Term-Frequency (Pyodide + precomputed chap_lemmas.csv)</span></a></li></ol></nav>
         <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
         </a>
       <button type="button" class="btn quarto-search-button" aria-label="Search" onclick="window.quartoOpenSearch();">
@@ -134,7 +132,7 @@ ul.task-list li input[type="checkbox"] {
     <ul class="list-unstyled mt-1">
         <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./index.html" class="sidebar-item-text sidebar-link active">
+  <a href="./index.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">Preface</span></a>
   </div>
 </li>
@@ -170,7 +168,7 @@ ul.task-list li input[type="checkbox"] {
 </li>
         <li class="sidebar-item">
   <div class="sidebar-item-container"> 
-  <a href="./dracula-lemmata-pyodide.html" class="sidebar-item-text sidebar-link">
+  <a href="./dracula-lemmata-pyodide.html" class="sidebar-item-text sidebar-link active">
  <span class="menu-text"><span class="chapter-number">5</span>&nbsp; <span class="chapter-title">Dracula — Lemmatized Term-Frequency (Pyodide + precomputed chap_lemmas.csv)</span></span></a>
   </div>
 </li>
@@ -180,68 +178,246 @@ ul.task-list li input[type="checkbox"] {
 <div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
 <!-- margin-sidebar -->
     <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
-        <nav id="TOC" role="doc-toc" class="toc-active">
-    <h2 id="toc-title">Table of contents</h2>
-   
-  <ul>
-  <li><a href="#preface" id="toc-preface" class="nav-link active" data-scroll-target="#preface">Preface</a></li>
-  </ul>
-<div class="quarto-code-links"><h2>Code Links</h2><ul><li><a href="https://mybinder.org/v2/gh/IULibScholComm/dracula/HEAD?urlpath=vscode" target="_blank"><i class="bi bi-journals"></i>Launch Binder</a></li></ul></div></nav>
-    </div>
+        
+    <div class="quarto-code-links"><h2>Code Links</h2><ul><li><a href="https://mybinder.org/v2/gh/IULibScholComm/dracula/HEAD?urlpath=vscode" target="_blank"><i class="bi bi-journals"></i>Launch Binder</a></li></ul></div></div>
 <!-- main -->
 <main class="content" id="quarto-document-content">
 
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
-<h1 class="title">Dracula</h1>
-<p class="subtitle lead">A Computational Scholarly Edition</p>
+<h1 class="title"><span class="chapter-number">5</span>&nbsp; <span class="chapter-title">Dracula — Lemmatized Term-Frequency (Pyodide + precomputed chap_lemmas.csv)</span></h1>
 </div>
 
-<div>
-  <div class="description">
-    <p>An edition of Bram Stoker’s Dracula that presents the original text alongside computational analyses and visualizations of it.</p>
-  </div>
-</div>
 
 
 <div class="quarto-title-meta">
 
-    <div>
-    <div class="quarto-title-meta-heading">Author</div>
-    <div class="quarto-title-meta-contents">
-             <p>Bram Stoker </p>
-          </div>
-  </div>
     
-    <div>
-    <div class="quarto-title-meta-heading">Published</div>
-    <div class="quarto-title-meta-contents">
-      <p class="date">2026</p>
-    </div>
-  </div>
   
     
   </div>
   
-<div>
-  <div class="abstract">
-    <div class="block-title">Abstract</div>
-    <p>This edition of Bram Stoker’s Dracula presents the original text alongside computational analyses and visualizations of it to enable one to explore the book via close readings and distant reading. The analyses include sentiment analysis and mapping of place references in the book sized by number of references. The book is intended for scholars and students of literature, as well as anyone interested in digital humanities and the intersection of literature and data science.</p>
-  </div>
-</div>
 
 
 </header>
 
 
+<p>This page runs entirely in the browser (Pyodide). It expects a <code>chap_lemmas.csv</code> with the columns:</p>
+<ul>
+<li><code>chapter</code> (int)</li>
+<li><code>marker</code> (text; optional)</li>
+<li><code>lemmas_str</code> (space-separated lemmatized tokens, e.g., <code>"vampire count dracula ..."</code>)</li>
+<li><code>word_count</code> (int; words in the chapter)</li>
+</ul>
+<p>This page will attempt to fetch <code>/data/chap_lemmas.csv</code> first (as you specified). If that path fails it will try a couple common alternatives.</p>
+<div style="max-width:900px">
+<p>
+Enter a single <strong>lemmatized</strong> word (no multi-word phrases). Example: <code>vampire</code>
+</p>
+<p><label for="lemma">Lemma:</label> <input id="lemma" placeholder="vampire" style="width:220px"> <button id="plotBtn">Plot</button> <label style="margin-left:12px"><input type="checkbox" id="normalize"> Normalize (per 1k words)</label></p>
+<div id="status" style="margin-top:8px;color:#666">
+Status: initializing…
+</div>
+<div id="plotArea" style="margin-top:12px">
 
-<section id="preface" class="level1 unnumbered">
-<h1 class="unnumbered">Preface</h1><p><img src="Dracula_cover.jpg" title="Dracula" class="quarto-cover-image nolightbox img-fluid" alt="book cover of Dracula with a yellow background and red title, author, and border"></p>
-<p>This is a Quarto book that uses binder.</p>
-<p>To learn more about Quarto books visit <a href="https://quarto.org/docs/books" class="uri">https://quarto.org/docs/books</a>.</p>
+</div>
+<p style="color:#666; margin-top:14px; font-size:0.95em">
+If you want full spaCy-powered searches or NER, run the original notebook in Binder/Colab; this page is designed for lightweight in-browser lemmatized lookups using a precomputed CSV.
+</p>
+</div>
+<script type="module">
+/* Pyodide client that:
+   - loads pyodide + micropip,
+   - installs pandas & matplotlib,
+   - fetches chap_lemmas.csv as text,
+   - initializes per-chapter Counters from the 'lemmas_str' column,
+   - on query, computes counts per chapter and returns a base64 PNG (matplotlib).
+*/
+
+// Try these candidate locations (user-specified first)
+const CSV_CANDIDATES = ["/data/chap_lemmas.csv", "data/chap_lemmas.csv", "_resources/chap_lemmas.csv", "chap_lemmas.csv"];
+
+const statusEl = document.getElementById("status");
+const plotEl = document.getElementById("plotArea");
+const plotBtn = document.getElementById("plotBtn");
+const lemmaInput = document.getElementById("lemma");
+const normalizeBox = document.getElementById("normalize");
+
+let pyodide = null;
+let pyReady = false;
+let csvTextCache = null;
+
+async function loadPy() {
+  statusEl.textContent = "Status: loading Pyodide (may take a few seconds)...";
+  if (typeof loadPyodide !== "function") {
+    const s = document.createElement("script");
+    s.src = "https://cdn.jsdelivr.net/pyodide/v0.23.4/full/pyodide.js";
+    document.head.appendChild(s);
+    await new Promise(res => { s.onload = res; });
+  }
+  pyodide = await loadPyodide({ indexURL: "https://cdn.jsdelivr.net/pyodide/v0.23.4/full/" });
+  statusEl.textContent = "Status: installing micropip & packages...";
+  await pyodide.loadPackage(["micropip"]);
+  const micropip = pyodide.pyimport("micropip");
+  // install pandas & matplotlib (pyodide wheels)
+  await micropip.install("pandas");
+  await micropip.install("matplotlib");
+  // ensure numpy
+  await pyodide.loadPackage(["numpy"]);
+  statusEl.textContent = "Status: Python environment ready.";
+  pyReady = true;
+}
+
+async function tryFetchCandidates(candidates) {
+  for (const url of candidates) {
+    statusEl.textContent = `Status: attempting to fetch ${url} ...`;
+    try {
+      const r = await fetch(url);
+      if (!r.ok) {
+        console.debug(`Candidate ${url} returned ${r.status}`);
+        continue;
+      }
+      const txt = await r.text();
+      statusEl.textContent = `Status: loaded ${url}`;
+      return { url, text: txt };
+    } catch (e) {
+      console.debug(`Fetch ${url} failed:`, e);
+      continue;
+    }
+  }
+  throw new Error("All CSV fetch attempts failed.");
+}
+
+// Python template: load CSV from injected 'csv_text', build per-chapter counters, return a Python object handle
+const initPyCode = `
+import io, pandas as pd, re
+from collections import Counter
+csv_text = csv_text  # injected
+df = pd.read_csv(io.StringIO(csv_text), encoding='utf-8')
+# Ensure expected columns
+for col in ['chapter','lemmas_str','word_count']:
+    if col not in df.columns:
+        raise ValueError("chap_lemmas.csv must contain column: " + col)
+# normalize types
+df['chapter'] = pd.to_numeric(df['chapter'], errors='coerce').fillna(0).astype(int)
+df['lemmas_str'] = df['lemmas_str'].fillna("").astype(str)
+df['word_count'] = pd.to_numeric(df['word_count'], errors='coerce').fillna(0).astype(int)
+# Build per-chapter counters
+chapter_counters = []
+for s in df['lemmas_str'].tolist():
+    if not s:
+        chapter_counters.append(Counter())
+    else:
+        chapter_counters.append(Counter(s.split()))
+# return tuple: df (for metadata) and counters
+(df, chapter_counters)
+`;
+
+const plotPyTemplate = `
+import io, base64, matplotlib
+matplotlib.use("agg")
+import matplotlib.pyplot as plt
+import numpy as np
+# injected: df, counters, query, normalize_flag
+q = query.strip().lower()
+if not q:
+    raise ValueError("Empty query")
+# count per chapter using counters (list of Counter)
+counts = [c.get(q, 0) for c in counters]
+lengths = df['word_count'].tolist()
+arr = np.array(counts, dtype=float)
+if normalize_flag:
+    lens = np.array(lengths, dtype=float)
+    lens[lens==0] = 1.0
+    arr = arr / lens * 1000.0
+x = np.arange(1, len(arr)+1)
+fig, ax = plt.subplots(figsize=(9,3))
+ax.plot(x, arr, marker='o', linewidth=1)
+ax.set_xlabel("Chapter")
+ax.set_ylabel("Occurrences per 1k words" if normalize_flag else "Raw count")
+ax.set_title(f"Frequency of '{query}' (lemmatized) — n_chapters={len(arr)}")
+ax.grid(axis='y', alpha=0.3)
+plt.tight_layout()
+buf = io.BytesIO()
+fig.savefig(buf, format='png', dpi=150)
+plt.close(fig)
+buf.seek(0)
+base64.b64encode(buf.getvalue()).decode('ascii')
+`;
+
+let pyState = null; // will hold tuple (df, counters) as PyProxy
+
+(async () => {
+  try {
+    await loadPy();
+    // fetch CSV from the candidate list (user-specified /data path first)
+    let csvResult = null;
+    try {
+      csvResult = await tryFetchCandidates(CSV_CANDIDATES);
+    } catch (fetchErr) {
+      console.error(fetchErr);
+      statusEl.textContent = "Status: failed to fetch chap_lemmas.csv. Place the file at /data/chap_lemmas.csv or update CSV_CANDIDATES.";
+      return;
+    }
+    csvTextCache = csvResult.text;
+    statusEl.textContent = `Status: building lemma counters from ${csvResult.url} (Python)...`;
+    pyodide.globals.set("csv_text", csvTextCache);
+    const res = await pyodide.runPythonAsync(initPyCode);
+    pyState = res;
+    // cleanup large global
+    pyodide.globals.delete("csv_text");
+    statusEl.textContent = `Status: ready (using ${csvResult.url}). Enter a lemmatized word and click Plot.`;
+  } catch (err) {
+    console.error(err);
+    statusEl.textContent = "Status: initialization error: " + String(err);
+  }
+})();
+
+// perform plotting call
+async function plotLemma(query, normalize) {
+  if (!pyReady || pyState === null) {
+    statusEl.textContent = "Status: Python state not ready.";
+    return;
+  }
+  statusEl.textContent = "Status: computing counts & plotting...";
+  try {
+    // put handles into globals
+    pyodide.globals.set("df", pyState[0]);         // PyProxy to DataFrame
+    pyodide.globals.set("counters", pyState[1]);   // PyProxy to list of Counter
+    pyodide.globals.set("query", query);
+    pyodide.globals.set("normalize_flag", normalize);
+    const b64 = await pyodide.runPythonAsync(plotPyTemplate);
+    // cleanup
+    pyodide.globals.delete("df");
+    pyodide.globals.delete("counters");
+    pyodide.globals.delete("query");
+    pyodide.globals.delete("normalize_flag");
+    // render image
+    plotEl.innerHTML = "";
+    const img = document.createElement("img");
+    img.src = "data:image/png;base64," + b64;
+    img.alt = `Lemma frequency: ${query}`;
+    img.style.maxWidth = "100%";
+    plotEl.appendChild(img);
+    statusEl.textContent = "Status: done.";
+  } catch (e) {
+    console.error(e);
+    statusEl.textContent = "Status: error: " + String(e);
+    plotEl.innerHTML = "<pre style='color:red'>Error: " + String(e) + "</pre>";
+  }
+}
+
+// UI wiring
+plotBtn.addEventListener("click", () => {
+  const q = lemmaInput.value.trim();
+  if (!q) { alert("Enter a lemmatized single word (e.g., 'vampire')."); return; }
+  plotLemma(q, normalizeBox.checked);
+});
+lemmaInput.addEventListener("keydown", (e) => { if (e.key === "Enter") plotBtn.click(); });
+
+</script>
 
 
-</section>
 
 </main> <!-- /main -->
 <script id="quarto-html-after-body" type="application/javascript">
@@ -655,11 +831,11 @@ ul.task-list li input[type="checkbox"] {
   </script>
 <nav class="page-navigation">
   <div class="nav-page nav-page-previous">
+      <a href="./99-text-analysis.html" class="pagination-link" aria-label="Text analysis: Dracula">
+        <i class="bi bi-arrow-left-short"></i> <span class="nav-page-text"><span class="chapter-number">4</span>&nbsp; <span class="chapter-title">Text analysis: Dracula</span></span>
+      </a>          
   </div>
   <div class="nav-page nav-page-next">
-      <a href="./note.html" class="pagination-link" aria-label="Note">
-        <span class="nav-page-text">Note</span> <i class="bi bi-arrow-right-short"></i>
-      </a>
   </div>
 </nav>
 </div> <!-- /content -->

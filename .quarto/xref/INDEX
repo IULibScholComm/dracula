@@ -16,5 +16,11 @@
   },
   "99-text-analysis.qmd": {
     "99-text-analysis.html": "5d2e24ba"
+  },
+  "dracula-pyodide-interactive.qmd": {
+    "dracula-pyodide-interactive.html": "cb26e084"
+  },
+  "dracula-lemmata-pyodide.qmd": {
+    "dracula-lemmata-pyodide.html": "1f9316dc"
   }
 }

@@ -1,0 +1,201 @@
+---
+title: "Dracula — In-browser Interactive (Pyodide)"
+format: html
+execute:
+  echo: false
+  enabled: true
+---
+
+This page runs entirely in the browser using **Pyodide**. It provides a lightweight interactive: type a term and plot its frequency across chapters (split by visible chapter markers when present; otherwise 40 equal chunks). For full spaCy-based lemmatized queries, use the Binder / Colab link in the project README.
+
+<div style="max-width:900px">
+  <p>
+    Enter a search term (single word or phrase) and click <strong>Plot</strong>.
+    Toggle <em>Normalize</em> to show counts per 1,000 characters.
+  </p>
+
+  <label for="term">Term:</label>
+  <input id="term" placeholder="vampire" style="width:220px" />
+  <button id="plotBtn">Plot</button>
+  <label style="margin-left:12px"><input type="checkbox" id="normalize" /> Normalize (per 1k chars)</label>
+
+  <div id="status" style="margin-top:8px;color:#666">Status: initializing...</div>
+  <div id="plotArea" style="margin-top:12px"></div>
+  <hr style="margin-top:18px"/>
+  <p style="color:#666; font-size:0.95em">
+    Note: this client-side interactive uses basic regex tokenization. For lemmatized queries or spaCy NER, open the Binder build (see README).
+  </p>
+</div>
+
+<script type="module">
+  const TEXT_URL = "dracula_clean.txt"; // place this file next to your .qmd/site root or change path
+  const status = document.getElementById("status");
+  const plotArea = document.getElementById("plotArea");
+  const plotBtn = document.getElementById("plotBtn");
+  const termInput = document.getElementById("term");
+  const normalizeBox = document.getElementById("normalize");
+
+  let pyodide = null;
+  let pyReady = false;
+
+  async function loadPyodideAndPackages() {
+    status.textContent = "Status: loading Pyodide (may take a few seconds)...";
+    // load loader
+    if (typeof loadPyodide !== "function") {
+      const s = document.createElement("script");
+      s.src = "https://cdn.jsdelivr.net/pyodide/v0.23.4/full/pyodide.js";
+      document.head.appendChild(s);
+      await new Promise((res) => { s.onload = res; });
+    }
+    pyodide = await loadPyodide({indexURL: "https://cdn.jsdelivr.net/pyodide/v0.23.4/full/"});
+    status.textContent = "Status: Pyodide loaded — installing micropip and packages...";
+    await pyodide.loadPackage(["micropip"]);
+    // we need numpy, matplotlib, pandas; micropip used for some wheels
+    const micropip = pyodide.pyimport("micropip");
+    // matplotlib and pandas may already be available in pyodide wheels; micropip.install is safe
+    await micropip.install("matplotlib");
+    await micropip.install("pandas");
+    // numpy is a base package; ensure loaded
+    await pyodide.loadPackage(["numpy"]);
+    status.textContent = "Status: Python packages ready.";
+    pyReady = true;
+  }
+
+  async function fetchText() {
+    status.textContent = "Status: fetching text...";
+    try {
+      const r = await fetch(TEXT_URL);
+      if (!r.ok) throw new Error(`${TEXT_URL} fetch failed (${r.status})`);
+      const txt = await r.text();
+      status.textContent = "Status: text loaded.";
+      return txt;
+    } catch (e) {
+      status.textContent = `Status: failed to load ${TEXT_URL}.`;
+      throw e;
+    }
+  }
+
+  // Python code executed under pyodide: chapter split, count, plot -> base64 PNG
+  const pyTemplate = `
+import re, io, base64
+import matplotlib
+matplotlib.use("agg")
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+
+_text = text  # injected plain text
+_term = term
+_normalize = normalize_flag
+
+# Attempt chapter split by common "CHAPTER" markers (captures roman/arabic)
+parts = re.split(r'(?m)^\\s*(?:CHAPTER|Chapter|chapter)\\b[^\\n]*', _text)
+# The split above drops the matched "CHAPTER ..." headers, so try an alternative if no split
+if len([p for p in parts if p.strip()]) <= 1:
+    # fallback: split on pattern like "[CHAPTER 1]" too
+    parts = re.split(r'(?m)^\\s*\\[CHAPTER\\s+\\d+\\]', _text, flags=re.IGNORECASE)
+if len([p for p in parts if p.strip()]) <= 1:
+    # final fallback: N equal chunks
+    N = 40
+    L = len(_text)
+    parts = [ _text[i*L//N:(i+1)*L//N] for i in range(N) ]
+
+chunks = [p for p in parts if p is not None]
+
+# Counting: simple regex token match (case-insensitive); allow multi-word phrase by splitting on whitespace
+q = _term.strip()
+if q == "":
+    raise ValueError("Empty query")
+# build a word-boundary friendly pattern that tolerates internal whitespace
+q_esc = re.escape(q)
+q_esc = q_esc.replace(r"\\ ", r"\\s+")
+pattern = re.compile(rf"\\b{q_esc}\\b", flags=re.IGNORECASE)
+
+counts = []
+lengths = []
+for c in chunks:
+    s = c or ""
+    lengths.append(len(s))
+    if s.strip()=="":
+        counts.append(0)
+    else:
+        counts.append(len(pattern.findall(s)))
+
+arr = np.array(counts, dtype=float)
+if _normalize:
+    lengths_arr = np.array(lengths, dtype=float)
+    lengths_arr[lengths_arr==0] = 1.0
+    arr = arr / lengths_arr * 1000.0
+# build simple x labels (chapter indices)
+x = np.arange(1, len(arr)+1)
+
+fig, ax = plt.subplots(figsize=(9,3))
+ax.plot(x, arr, marker='o', linewidth=1)
+ax.set_xlabel("Chunk/Chapter")
+ax.set_ylabel("Normalized (per 1k chars)" if _normalize else "Raw count")
+ax.set_title(f"Frequency of '{_term}' across text (n_chunks={len(arr)})")
+ax.grid(axis='y', alpha=0.3)
+plt.tight_layout()
+
+buf = io.BytesIO()
+fig.savefig(buf, format='png', dpi=150)
+plt.close(fig)
+buf.seek(0)
+base64.b64encode(buf.getvalue()).decode('ascii')
+`;
+
+  // Boot Pyodide
+  (async () => {
+    try {
+      await loadPyodideAndPackages();
+      status.textContent = "Status: ready. Enter a term and click Plot.";
+    } catch (err) {
+      console.error(err);
+      status.textContent = "Status: Pyodide initialization failed: " + String(err);
+    }
+  })();
+
+  async function makePlot(term, normalize) {
+    if (!pyReady) {
+      status.textContent = "Status: Pyodide not ready yet.";
+      return;
+    }
+    status.textContent = "Status: preparing...";
+    try {
+      const text = await fetchText();
+      // inject variables
+      pyodide.globals.set("text", text);
+      pyodide.globals.set("term", term);
+      pyodide.globals.set("normalize_flag", normalize);
+      status.textContent = "Status: computing plot in Python...";
+      const b64 = await pyodide.runPythonAsync(pyTemplate);
+      // cleanup
+      pyodide.globals.delete("text");
+      pyodide.globals.delete("term");
+      pyodide.globals.delete("normalize_flag");
+      // render
+      plotArea.innerHTML = "";
+      const img = document.createElement("img");
+      img.src = "data:image/png;base64," + b64;
+      img.alt = `Frequency plot for ${term}`;
+      img.style.maxWidth = "100%";
+      plotArea.appendChild(img);
+      status.textContent = "Status: done.";
+    } catch (e) {
+      console.error(e);
+      status.textContent = "Status: error: " + String(e);
+      plotArea.innerHTML = "<pre style='color:red'>Error: " + String(e) + "</pre>";
+    }
+  }
+
+  // UI wiring
+  plotBtn.addEventListener("click", () => {
+    const q = termInput.value.trim();
+    if (!q) { alert("Enter a term."); return; }
+    makePlot(q, normalizeBox.checked);
+  });
+
+  termInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") plotBtn.click();
+  });
+</script>

@@ -53,6 +53,7 @@ book:
     - 2.qmd
     - 3.qmd
     - 99-text-analysis.qmd
+    - dracula-lemmata-pyodide.qmd
   code-links: binder
 
 format:

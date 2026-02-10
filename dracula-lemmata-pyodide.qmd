@@ -1,0 +1,224 @@
+---
+title: "Dracula — Lemmatized Term-Frequency (Pyodide + precomputed chap_lemmas.csv)"
+format: html
+execute:
+  echo: false
+  enabled: true
+---
+
+This page runs entirely in the browser (Pyodide). It expects a `chap_lemmas.csv` with the columns:
+
+- `chapter` (int)
+- `marker` (text; optional)
+- `lemmas_str` (space-separated lemmatized tokens, e.g., `"vampire count dracula ..."`)
+- `word_count` (int; words in the chapter)
+
+This page will attempt to fetch `/data/chap_lemmas.csv` first (as you specified). If that path fails it will try a couple common alternatives.
+
+<div style="max-width:900px">
+  <p>Enter a single **lemmatized** word (no multi-word phrases). Example: <code>vampire</code></p>
+
+  <label for="lemma">Lemma:</label>
+  <input id="lemma" placeholder="vampire" style="width:220px" />
+  <button id="plotBtn">Plot</button>
+  <label style="margin-left:12px"><input type="checkbox" id="normalize" /> Normalize (per 1k words)</label>
+
+  <div id="status" style="margin-top:8px;color:#666">Status: initializing...</div>
+  <div id="plotArea" style="margin-top:12px"></div>
+
+  <p style="color:#666; margin-top:14px; font-size:0.95em">
+    If you want full spaCy-powered searches or NER, run the original notebook in Binder/Colab; this page is designed for lightweight in-browser lemmatized lookups using a precomputed CSV.
+  </p>
+</div>
+
+<script type="module">
+/* Pyodide client that:
+   - loads pyodide + micropip,
+   - installs pandas & matplotlib,
+   - fetches chap_lemmas.csv as text,
+   - initializes per-chapter Counters from the 'lemmas_str' column,
+   - on query, computes counts per chapter and returns a base64 PNG (matplotlib).
+*/
+
+// Try these candidate locations (user-specified first)
+const CSV_CANDIDATES = ["/data/chap_lemmas.csv", "data/chap_lemmas.csv", "_resources/chap_lemmas.csv", "chap_lemmas.csv"];
+
+const statusEl = document.getElementById("status");
+const plotEl = document.getElementById("plotArea");
+const plotBtn = document.getElementById("plotBtn");
+const lemmaInput = document.getElementById("lemma");
+const normalizeBox = document.getElementById("normalize");
+
+let pyodide = null;
+let pyReady = false;
+let csvTextCache = null;
+
+async function loadPy() {
+  statusEl.textContent = "Status: loading Pyodide (may take a few seconds)...";
+  if (typeof loadPyodide !== "function") {
+    const s = document.createElement("script");
+    s.src = "https://cdn.jsdelivr.net/pyodide/v0.23.4/full/pyodide.js";
+    document.head.appendChild(s);
+    await new Promise(res => { s.onload = res; });
+  }
+  pyodide = await loadPyodide({ indexURL: "https://cdn.jsdelivr.net/pyodide/v0.23.4/full/" });
+  statusEl.textContent = "Status: installing micropip & packages...";
+  await pyodide.loadPackage(["micropip"]);
+  const micropip = pyodide.pyimport("micropip");
+  // install pandas & matplotlib (pyodide wheels)
+  await micropip.install("pandas");
+  await micropip.install("matplotlib");
+  // ensure numpy
+  await pyodide.loadPackage(["numpy"]);
+  statusEl.textContent = "Status: Python environment ready.";
+  pyReady = true;
+}
+
+async function tryFetchCandidates(candidates) {
+  for (const url of candidates) {
+    statusEl.textContent = `Status: attempting to fetch ${url} ...`;
+    try {
+      const r = await fetch(url);
+      if (!r.ok) {
+        console.debug(`Candidate ${url} returned ${r.status}`);
+        continue;
+      }
+      const txt = await r.text();
+      statusEl.textContent = `Status: loaded ${url}`;
+      return { url, text: txt };
+    } catch (e) {
+      console.debug(`Fetch ${url} failed:`, e);
+      continue;
+    }
+  }
+  throw new Error("All CSV fetch attempts failed.");
+}
+
+// Python template: load CSV from injected 'csv_text', build per-chapter counters, return a Python object handle
+const initPyCode = `
+import io, pandas as pd, re
+from collections import Counter
+csv_text = csv_text  # injected
+df = pd.read_csv(io.StringIO(csv_text), encoding='utf-8')
+# Ensure expected columns
+for col in ['chapter','lemmas_str','word_count']:
+    if col not in df.columns:
+        raise ValueError("chap_lemmas.csv must contain column: " + col)
+# normalize types
+df['chapter'] = pd.to_numeric(df['chapter'], errors='coerce').fillna(0).astype(int)
+df['lemmas_str'] = df['lemmas_str'].fillna("").astype(str)
+df['word_count'] = pd.to_numeric(df['word_count'], errors='coerce').fillna(0).astype(int)
+# Build per-chapter counters
+chapter_counters = []
+for s in df['lemmas_str'].tolist():
+    if not s:
+        chapter_counters.append(Counter())
+    else:
+        chapter_counters.append(Counter(s.split()))
+# return tuple: df (for metadata) and counters
+(df, chapter_counters)
+`;
+
+const plotPyTemplate = `
+import io, base64, matplotlib
+matplotlib.use("agg")
+import matplotlib.pyplot as plt
+import numpy as np
+# injected: df, counters, query, normalize_flag
+q = query.strip().lower()
+if not q:
+    raise ValueError("Empty query")
+# count per chapter using counters (list of Counter)
+counts = [c.get(q, 0) for c in counters]
+lengths = df['word_count'].tolist()
+arr = np.array(counts, dtype=float)
+if normalize_flag:
+    lens = np.array(lengths, dtype=float)
+    lens[lens==0] = 1.0
+    arr = arr / lens * 1000.0
+x = np.arange(1, len(arr)+1)
+fig, ax = plt.subplots(figsize=(9,3))
+ax.plot(x, arr, marker='o', linewidth=1)
+ax.set_xlabel("Chapter")
+ax.set_ylabel("Occurrences per 1k words" if normalize_flag else "Raw count")
+ax.set_title(f"Frequency of '{query}' (lemmatized) — n_chapters={len(arr)}")
+ax.grid(axis='y', alpha=0.3)
+plt.tight_layout()
+buf = io.BytesIO()
+fig.savefig(buf, format='png', dpi=150)
+plt.close(fig)
+buf.seek(0)
+base64.b64encode(buf.getvalue()).decode('ascii')
+`;
+
+let pyState = null; // will hold tuple (df, counters) as PyProxy
+
+(async () => {
+  try {
+    await loadPy();
+    // fetch CSV from the candidate list (user-specified /data path first)
+    let csvResult = null;
+    try {
+      csvResult = await tryFetchCandidates(CSV_CANDIDATES);
+    } catch (fetchErr) {
+      console.error(fetchErr);
+      statusEl.textContent = "Status: failed to fetch chap_lemmas.csv. Place the file at /data/chap_lemmas.csv or update CSV_CANDIDATES.";
+      return;
+    }
+    csvTextCache = csvResult.text;
+    statusEl.textContent = `Status: building lemma counters from ${csvResult.url} (Python)...`;
+    pyodide.globals.set("csv_text", csvTextCache);
+    const res = await pyodide.runPythonAsync(initPyCode);
+    pyState = res;
+    // cleanup large global
+    pyodide.globals.delete("csv_text");
+    statusEl.textContent = `Status: ready (using ${csvResult.url}). Enter a lemmatized word and click Plot.`;
+  } catch (err) {
+    console.error(err);
+    statusEl.textContent = "Status: initialization error: " + String(err);
+  }
+})();
+
+// perform plotting call
+async function plotLemma(query, normalize) {
+  if (!pyReady || pyState === null) {
+    statusEl.textContent = "Status: Python state not ready.";
+    return;
+  }
+  statusEl.textContent = "Status: computing counts & plotting...";
+  try {
+    // put handles into globals
+    pyodide.globals.set("df", pyState[0]);         // PyProxy to DataFrame
+    pyodide.globals.set("counters", pyState[1]);   // PyProxy to list of Counter
+    pyodide.globals.set("query", query);
+    pyodide.globals.set("normalize_flag", normalize);
+    const b64 = await pyodide.runPythonAsync(plotPyTemplate);
+    // cleanup
+    pyodide.globals.delete("df");
+    pyodide.globals.delete("counters");
+    pyodide.globals.delete("query");
+    pyodide.globals.delete("normalize_flag");
+    // render image
+    plotEl.innerHTML = "";
+    const img = document.createElement("img");
+    img.src = "data:image/png;base64," + b64;
+    img.alt = `Lemma frequency: ${query}`;
+    img.style.maxWidth = "100%";
+    plotEl.appendChild(img);
+    statusEl.textContent = "Status: done.";
+  } catch (e) {
+    console.error(e);
+    statusEl.textContent = "Status: error: " + String(e);
+    plotEl.innerHTML = "<pre style='color:red'>Error: " + String(e) + "</pre>";
+  }
+}
+
+// UI wiring
+plotBtn.addEventListener("click", () => {
+  const q = lemmaInput.value.trim();
+  if (!q) { alert("Enter a lemmatized single word (e.g., 'vampire')."); return; }
+  plotLemma(q, normalizeBox.checked);
+});
+lemmaInput.addEventListener("keydown", (e) => { if (e.key === "Enter") plotBtn.click(); });
+
+</script>
