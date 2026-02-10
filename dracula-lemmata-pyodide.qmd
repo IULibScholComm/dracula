@@ -13,7 +13,8 @@ execute:
   <button id="plotBtn">Plot</button>
   <label style="margin-left:12px"><input type="checkbox" id="normalize" /> Normalize (per 1k words)</label>
 
-  <div id="status" style="margin-top:8px;color:#666">Status: initializing...</div>
+  <!-- status is now an ARIA live region -->
+  <div id="status" style="margin-top:8px;color:#666" aria-live="polite" role="status">Status: initializing...</div>
   <div id="plotArea" style="margin-top:12px"></div>
 
   <p style="color:#666; margin-top:14px; font-size:0.95em">
@@ -22,12 +23,8 @@ execute:
 </div>
 
 <script type="module">
-/* Single unified Pyodide-powered script.
-   - Replaces duplicate functions / states in your prior version.
-   - Keeps pyState as an object { df_proxy, counters_proxy, source }.
-*/
+/* Unified Pyodide script with accessibility outputs + trend calculation */
 
-// Candidate CSV paths (replace/extend as you like)
 const CSV_CANDIDATES = [
   "https://iulibscholcomm.github.io/dracula/data/chap_lemmas.csv",
   "/dracula/data/chap_lemmas.csv",
@@ -47,7 +44,8 @@ let pyReady = false;
 let csvTextCache = null;
 let pyState = null; // { df_proxy, counters_proxy, source }
 
-// Python snippets used later
+// ---------- Python snippets ----------
+// Initialization (unchanged except variable names preserved)
 const initPyGlobals = `
 import io, pandas as pd
 from collections import Counter
@@ -90,8 +88,11 @@ chapter_counters = chapter_counters
 "OK"
 `;
 
+/* Plot template now returns a tuple: (base64_png, out_json)
+   out_json includes numeric arrays and a short trend sentence computed
+   using linear slope + Pearson r (numpy). */
 const plotPyTemplate = `
-import io, base64, matplotlib
+import io, base64, matplotlib, json
 matplotlib.use("agg")
 import matplotlib.pyplot as plt
 import numpy as np
@@ -101,19 +102,54 @@ q = query.strip().lower()
 if not q:
     raise ValueError("Empty query")
 
-# counters is expected to be an iterable of Counter objects
+# get counts per chapter
 try:
-    counts = [c.get(q, 0) for c in counters]
+    counts = [int(c.get(q, 0)) for c in counters]
 except Exception as e:
     raise ValueError("Error iterating counters: " + str(e))
 
-lengths = df['word_count'].tolist()
+lengths = [int(x) for x in df['word_count'].tolist()]
 arr = np.array(counts, dtype=float)
+
+# normalized series (per 1k words) if requested
 if normalize_flag:
     lens = np.array(lengths, dtype=float)
     lens[lens==0] = 1.0
-    arr = arr / lens * 1000.0
+    arr_norm = (arr / lens * 1000.0)
+    series_for_trend = arr_norm
+else:
+    arr_norm = None
+    series_for_trend = arr
 
+# simple trend calculation using linear regression and Pearson r
+trend_text = ""
+if len(series_for_trend) >= 2:
+    x = np.arange(1, len(series_for_trend)+1, dtype=float)
+    # fit linear slope (y = a*x + b)
+    a, b = np.polyfit(x, series_for_trend, 1)
+    # Pearson correlation
+    try:
+        r = float(np.corrcoef(x, series_for_trend)[0,1])
+    except Exception:
+        r = 0.0
+
+    # interpret: thresholds are heuristic
+    if abs(r) >= 0.4:
+        if a > 0:
+            trend_text = f"Increasing trend (slope={a:.3f}, r={r:.2f})."
+        else:
+            trend_text = f"Decreasing trend (slope={a:.3f}, r={r:.2f})."
+    elif abs(r) >= 0.2:
+        if a > 0:
+            trend_text = f"Mild upward trend (slope={a:.3f}, r={r:.2f})."
+        else:
+            trend_text = f"Mild downward trend (slope={a:.3f}, r={r:.2f})."
+    else:
+        trend_text = f"No clear trend (slope={a:.3f}, r={r:.2f})."
+else:
+    trend_text = "Not enough points to compute trend."
+
+# Plotting (visual for sighted users)
 x = np.arange(1, len(arr)+1)
 fig, ax = plt.subplots(figsize=(9,3))
 ax.plot(x, arr, marker='o', linewidth=1)
@@ -126,10 +162,38 @@ buf = io.BytesIO()
 fig.savefig(buf, format='png', dpi=150)
 plt.close(fig)
 buf.seek(0)
-base64.b64encode(buf.getvalue()).decode('ascii')
+b64 = base64.b64encode(buf.getvalue()).decode('ascii')
+
+# Prepare numeric summary
+arr_raw = arr.tolist()
+arr_norm_list = arr_norm.tolist() if arr_norm is not None else None
+
+total = int(np.sum(arr_raw))
+max_val = None if len(arr_raw)==0 else int(np.max(arr_raw))
+max_chapters = [] if max_val is None else [i+1 for i,v in enumerate(arr_raw) if int(v)==max_val]
+min_val = None if len(arr_raw)==0 else int(np.min(arr_raw))
+min_chapters = [] if min_val is None else [i+1 for i,v in enumerate(arr_raw) if int(v)==min_val]
+
+out = {
+    "query": query,
+    "n_chapters": len(arr_raw),
+    "counts_raw": arr_raw,
+    "counts_norm": arr_norm_list,
+    "word_counts": lengths,
+    "total_raw": total,
+    "max_raw": int(max_val) if max_val is not None else None,
+    "max_chapters": max_chapters,
+    "min_raw": int(min_val) if min_val is not None else None,
+    "min_chapters": min_chapters,
+    "trend_text": trend_text
+}
+
+out_json = json.dumps(out)
+b64, out_json
 `;
 
 // ---------- Helpers ----------
+
 async function loadPy() {
   statusEl.textContent = "Status: loading Pyodide (may take a few seconds)...";
   if (typeof loadPyodide !== "function") {
@@ -142,10 +206,8 @@ async function loadPy() {
   statusEl.textContent = "Status: installing micropip & packages...";
   await pyodide.loadPackage(["micropip"]);
   const micropip = pyodide.pyimport("micropip");
-  // install pandas & matplotlib (pyodide wheels)
   await micropip.install("pandas");
   await micropip.install("matplotlib");
-  // ensure numpy is available as well
   await pyodide.loadPackage(["numpy"]);
   statusEl.textContent = "Status: Python environment ready.";
   pyReady = true;
@@ -171,7 +233,7 @@ async function tryFetchCandidates(candidates) {
   throw new Error("All CSV fetch attempts failed.");
 }
 
-// ---------- Initialization sequence ----------
+// ---------- Initialization ----------
 (async () => {
   try {
     await loadPy();
@@ -195,16 +257,13 @@ async function tryFetchCandidates(candidates) {
   statusEl.textContent = `Status: building Python state from ${csvResult.url}...`;
 
   try {
-    // inject csv_text into Python globals and run initialization
     pyodide.globals.set("csv_text", csvTextCache);
     const ok = await pyodide.runPythonAsync(initPyGlobals);
-    // remove csv_text to free memory
     try { pyodide.globals.delete("csv_text"); } catch (e) {}
     if (ok !== "OK") {
       console.warn("Python init returned:", ok);
     }
 
-    // extract proxies
     const py_df = pyodide.globals.get("chap_df");
     const py_counters = pyodide.globals.get("chapter_counters");
 
@@ -224,7 +283,7 @@ async function tryFetchCandidates(candidates) {
   }
 })();
 
-// ---------- Single canonical plotting function ----------
+// ---------- Plotting function ----------
 async function plotLemma(query, normalize) {
   if (!pyReady) {
     statusEl.textContent = "Status: Pyodide not ready.";
@@ -244,32 +303,170 @@ async function plotLemma(query, normalize) {
     pyodide.globals.set("query", query);
     pyodide.globals.set("normalize_flag", normalize);
 
-    const b64 = await pyodide.runPythonAsync(plotPyTemplate);
+    // run and receive tuple: (b64_png, out_json)
+    const result = await pyodide.runPythonAsync(plotPyTemplate);
 
-    // cleanup injected globals to avoid accidental reuse / memory growth
+    // result behaves like an array-like proxy: index 0 -> b64 image, index 1 -> json string
+    const b64 = result[0];
+    const out_json = result[1];
+
+    // cleanup injected globals
     try { pyodide.globals.delete("df"); } catch(e){}
     try { pyodide.globals.delete("counters"); } catch(e){}
     try { pyodide.globals.delete("query"); } catch(e){}
     try { pyodide.globals.delete("normalize_flag"); } catch(e){}
 
-    // render image
+    // parse JSON safely
+    let data = null;
+    try {
+      data = JSON.parse(out_json);
+    } catch (e) {
+      console.warn("Failed to parse out_json:", e, out_json);
+      data = null;
+    }
+
+    // render image and accessible report
     plotEl.innerHTML = "";
     const img = document.createElement("img");
     img.src = "data:image/png;base64," + b64;
     img.alt = `Lemma frequency: ${query}`;
     img.style.maxWidth = "100%";
+    img.tabIndex = 0; // keyboard focusable
+
+    // accessible description region id
+    const descId = "plot-desc-" + Math.random().toString(36).slice(2,9);
+    img.setAttribute("aria-describedby", descId);
+
     plotEl.appendChild(img);
+
+    // Create region that contains summary, CSV download, table
+    const report = document.createElement("div");
+    report.id = descId;
+    report.style.marginTop = "10px";
+    report.setAttribute("role", "region");
+    report.setAttribute("aria-live", "polite");
+    report.setAttribute("aria-label", `Numeric summary for ${query}`);
+    plotEl.appendChild(report);
+
+    if (data) {
+      // trend sentence (from Python)
+      const trendP = document.createElement("p");
+      trendP.style.margin = "4px 0";
+      trendP.textContent = data.trend_text || "";
+      trendP.style.fontStyle = "italic";
+      report.appendChild(trendP);
+
+      // brief numeric summary
+      const summaryP = document.createElement("p");
+      summaryP.style.margin = "4px 0";
+      const maxCh = (data.max_chapters || []).join(", ") || "N/A";
+      const minCh = (data.min_chapters || []).join(", ") || "N/A";
+      const total = (data.total_raw !== undefined) ? data.total_raw : "N/A";
+      summaryP.textContent = `${data.n_chapters} chapters. Total occurrences (raw): ${total}. Highest raw count: ${data.max_raw} (chapter(s) ${maxCh}). Lowest raw count: ${data.min_raw} (chapter(s) ${minCh}).`;
+      report.appendChild(summaryP);
+
+      // CSV download
+      const csvBtn = document.createElement("a");
+      csvBtn.style.display = "inline-block";
+      csvBtn.style.margin = "6px 0";
+      csvBtn.textContent = "Download chapter counts (CSV)";
+      csvBtn.setAttribute("role","button");
+      csvBtn.setAttribute("aria-pressed","false");
+
+      const csvLines = ["chapter,word_count,raw_count" + (data.counts_norm ? ",normalized_per_1k" : "")];
+      for (let i=0;i<data.n_chapters;i++){
+        const chap = i+1;
+        const wc = (data.word_counts && data.word_counts[i]!==undefined) ? data.word_counts[i] : "";
+        const raw = (data.counts_raw && data.counts_raw[i]!==undefined) ? data.counts_raw[i] : 0;
+        const norm = (data.counts_norm && data.counts_norm[i]!==undefined) ? data.counts_norm[i] : "";
+        csvLines.push([chap, wc, raw, norm].filter((_,idx)=> idx<3 || data.counts_norm).join(","));
+      }
+      const csvContent = csvLines.join("\n");
+      const blob = new Blob([csvContent], {type:"text/csv"});
+      const blobUrl = URL.createObjectURL(blob);
+      csvBtn.href = blobUrl;
+      csvBtn.download = `dracula_${query}_chapter_counts.csv`;
+      report.appendChild(csvBtn);
+
+      // Accessible table
+      const table = document.createElement("table");
+      table.style.width = "100%";
+      table.style.borderCollapse = "collapse";
+      table.style.marginTop = "8px";
+      table.setAttribute("role", "table");
+      table.setAttribute("aria-describedby", descId + "-caption");
+
+      const caption = document.createElement("caption");
+      caption.id = descId + "-caption";
+      caption.style.textAlign = "left";
+      caption.style.fontWeight = "600";
+      caption.style.marginBottom = "4px";
+      caption.textContent = `Chapter counts for lemma "${data.query}"`;
+      table.appendChild(caption);
+
+      const thead = document.createElement("thead");
+      const hrow = document.createElement("tr");
+      ["Chapter","Word count","Raw occurrences", normalize ? "Normalized per 1k words" : null].forEach(h=>{
+        if (!h) return;
+        const th = document.createElement("th");
+        th.textContent = h;
+        th.scope = "col";
+        th.style.borderBottom = "1px solid #ccc";
+        th.style.padding = "6px 4px";
+        hrow.appendChild(th);
+      });
+      thead.appendChild(hrow);
+      table.appendChild(thead);
+
+      const tbody = document.createElement("tbody");
+      for (let i=0;i<data.n_chapters;i++){
+        const tr = document.createElement("tr");
+        const chapCell = document.createElement("th");
+        chapCell.scope = "row";
+        chapCell.textContent = (i+1).toString();
+        chapCell.style.padding = "6px 4px";
+        tr.appendChild(chapCell);
+
+        const wcCell = document.createElement("td");
+        wcCell.textContent = (data.word_counts && data.word_counts[i]!==undefined) ? data.word_counts[i] : "";
+        wcCell.style.padding = "6px 4px";
+        tr.appendChild(wcCell);
+
+        const rawCell = document.createElement("td");
+        rawCell.textContent = (data.counts_raw && data.counts_raw[i]!==undefined) ? data.counts_raw[i] : 0;
+        rawCell.style.padding = "6px 4px";
+        tr.appendChild(rawCell);
+
+        if (normalize) {
+          const normCell = document.createElement("td");
+          normCell.textContent = (data.counts_norm && data.counts_norm[i]!==undefined && data.counts_norm[i] !== null) ? Number(data.counts_norm[i]).toFixed(2) : "";
+          normCell.style.padding = "6px 4px";
+          tr.appendChild(normCell);
+        }
+
+        tbody.appendChild(tr);
+      }
+      table.appendChild(tbody);
+      report.appendChild(table);
+    } else {
+      const p2 = document.createElement("p");
+      p2.textContent = "No numeric data available for this query.";
+      report.appendChild(p2);
+    }
+
     statusEl.textContent = "Status: done.";
+    // Optionally focus the image so keyboard / screen reader users find it quickly:
+    // img.focus();
+
   } catch (err) {
     console.error("Error during plot:", err);
-    // provide concise user-facing message, details in console
     let msg = String(err);
-    statusEl.textContent = "Status: error during plotting — see console. " + (msg.split("\\n")[0] || "");
-    plotEl.innerHTML = "<pre style='color:red'>Error: " + (msg.split('\\n')[0] || msg) + "</pre>";
+    statusEl.textContent = "Status: error during plotting — see console. " + (msg.split("\n")[0] || "");
+    plotEl.innerHTML = "<pre style='color:red'>Error: " + (msg.split('\n')[0] || msg) + "</pre>";
   }
 }
 
-// ---------- UI wiring (single copy) ----------
+// ---------- UI wiring ----------
 plotBtn.addEventListener("click", () => {
   const q = lemmaInput.value.trim();
   if (!q) { alert("Enter a lemmatized single word (e.g., 'vampire')."); return; }
